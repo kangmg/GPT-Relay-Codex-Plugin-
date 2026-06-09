@@ -44,11 +44,34 @@ codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
 
 然後在 Codex Plugins 介面安裝 **GPT Relay**，再開一個新的 Codex thread，讓 Codex 載入新的插件 skill。
 
+## Chrome 設定
+
+GPT Relay 是透過你已登入的 Chrome session 去控制 ChatGPT，所以需要先安裝並啟用官方 Codex Chrome 插件。
+
+### 安裝 Codex Chrome 插件
+
+請先到 Chrome Web Store 安裝官方 Codex 插件：
+
+[Chrome Web Store 上的 Codex 插件](https://chromewebstore.google.com/detail/codex/hehggadaopoacecdllhhajmbjkdcmajg)
+
+![Chrome Web Store 上的 Codex 插件](./media/chrome-web-store-codex-extension.png)
+
+### 開啟本機檔案上傳權限
+
+如果你想讓 GPT Relay 控制 ChatGPT 上傳本機圖片或文件，需要替 Codex Chrome 插件開啟 file URL 權限：
+
+1. 打開 Chrome **Manage Extensions**。
+2. 找到 Codex 插件，點擊 **Details**。
+3. 開啟 **Allow access to file URLs**。
+
+![替 Codex Chrome 插件開啟 Allow access to file URLs](./media/chrome-extension-file-urls.png)
+
 ## 使用前需要
 
 - Codex 支援插件功能。
-- Codex 能使用 Chrome / Chrome automation。
+- 已安裝並啟用官方 Codex Chrome 插件。
 - 你的 Chrome 已經登入 ChatGPT。
+- 如果要上傳本機附件，請開啟 **Allow access to file URLs**。
 - 你的 ChatGPT 帳號本身要有你要求的模型或模式。比如 Pro 模式需要 ChatGPT Pro 帳號。
 
 ## Marketplace 需要什麼

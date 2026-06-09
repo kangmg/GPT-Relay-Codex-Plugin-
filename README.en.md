@@ -28,6 +28,28 @@ Then install **GPT Relay** from the Codex Plugins UI and open a new Codex thread
 
 The Add marketplace dialog installs this repository as a custom Codex marketplace source. It is not the same thing as publishing to an official built-in OpenAI marketplace.
 
+## Chrome Setup
+
+GPT Relay controls ChatGPT through your existing Chrome session, so you need the official Codex Chrome extension installed and enabled.
+
+### Install The Codex Chrome Extension
+
+Install the official Codex extension from the Chrome Web Store:
+
+[Codex on Chrome Web Store](https://chromewebstore.google.com/detail/codex/hehggadaopoacecdllhhajmbjkdcmajg)
+
+![Codex Chrome extension on Chrome Web Store](./media/chrome-web-store-codex-extension.png)
+
+### Enable File Uploads
+
+If you want GPT Relay to upload local files or images to ChatGPT, enable file URL access for the Codex Chrome extension:
+
+1. Open Chrome **Manage Extensions**.
+2. Open **Details** for the Codex extension.
+3. Turn on **Allow access to file URLs**.
+
+![Allow access to file URLs for Codex Chrome extension](./media/chrome-extension-file-urls.png)
+
 ## Repository Layout
 
 ```text
@@ -40,6 +62,8 @@ plugins/gpt-relay/
 media/
   plugin-install-screen.png
   gpt-relay-demo.gif
+  chrome-web-store-codex-extension.png
+  chrome-extension-file-urls.png
 ```
 
 ## Capabilities
@@ -55,7 +79,8 @@ media/
 
 ## Limitations
 
-- Requires Chrome automation and an active ChatGPT login.
+- Requires the official Codex Chrome extension and an active ChatGPT login.
+- Local file uploads require **Allow access to file URLs** to be enabled for the Codex Chrome extension.
 - Availability depends on your ChatGPT account.
 - The plugin operates the visible ChatGPT web UI, so ChatGPT UI changes may require plugin updates.
 - Long-running tasks may need polling from Codex.

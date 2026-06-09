@@ -44,11 +44,34 @@ codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
 
 Then install **GPT Relay** from the Codex Plugins UI and start a new Codex thread.
 
+## Chrome Setup
+
+GPT Relay controls ChatGPT through your existing Chrome session, so you need the official Codex Chrome extension installed and enabled.
+
+### Install The Codex Chrome Extension
+
+Install the official Codex extension from the Chrome Web Store:
+
+[Codex on Chrome Web Store](https://chromewebstore.google.com/detail/codex/hehggadaopoacecdllhhajmbjkdcmajg)
+
+![Codex Chrome extension on Chrome Web Store](./media/chrome-web-store-codex-extension.png)
+
+### Enable File Uploads
+
+If you want GPT Relay to upload local files or images to ChatGPT, enable file URL access for the Codex Chrome extension:
+
+1. Open Chrome **Manage Extensions**.
+2. Open **Details** for the Codex extension.
+3. Turn on **Allow access to file URLs**.
+
+![Allow access to file URLs for Codex Chrome extension](./media/chrome-extension-file-urls.png)
+
 ## Requirements
 
 - Codex with plugin support.
-- Chrome plugin / Chrome automation available in Codex.
+- Official Codex Chrome extension installed and enabled.
 - A logged-in ChatGPT session in Chrome.
+- **Allow access to file URLs** enabled if you want GPT Relay to upload local attachments.
 - Your ChatGPT account must have access to the model or mode you request. For example, Pro mode requires a ChatGPT Pro account.
 
 ## Marketplace Package
