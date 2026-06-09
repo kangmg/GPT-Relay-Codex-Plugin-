@@ -18,11 +18,7 @@ It is designed for users who want Codex to ask ChatGPT with visible ChatGPT Inte
 
 The demo below shows Codex calling GPT Relay while Chrome opens ChatGPT, switches the requested visible model/mode/effort, sends the prompt, and returns the result.
 
-[![Watch the GPT Relay demo](./media/gpt-relay-demo-thumbnail.png)](./media/gpt-relay-demo.mp4)
-
-Click the preview image or use the link below to open the video.
-
-[Open the demo video](./media/gpt-relay-demo.mp4)
+![GPT Relay demo](./media/gpt-relay-demo.gif)
 
 ## Install
 
@@ -38,16 +34,15 @@ In Codex, open **Plugins** → **Manage** → **Create** → **Add marketplace**
 
 After adding the marketplace, install **GPT Relay**, then start a new Codex thread.
 
-### Option B: Install From The CLI
+### Option B: Add The Marketplace From The CLI
 
-Run these commands in your Codex environment:
+Run this command in your Codex environment:
 
 ```bash
 codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
-codex plugin add gpt-relay@gpt-relay
 ```
 
-Then start a new Codex thread so the plugin skill is loaded.
+Then install **GPT Relay** from the Codex Plugins UI and start a new Codex thread.
 
 ## Requirements
 
@@ -98,10 +93,9 @@ To update the marketplace source later:
 
 ```bash
 codex plugin marketplace upgrade gpt-relay
-codex plugin add gpt-relay@gpt-relay
 ```
 
-Start a new Codex thread after updating.
+Update or reinstall **GPT Relay** from the Codex Plugins UI, then start a new Codex thread.
 
 ## Notes
 

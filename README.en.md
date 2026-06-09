@@ -18,14 +18,13 @@ From the Codex UI:
 | Git ref | `main` |
 | Sparse paths | Leave blank for normal install. Optional: `.agents/plugins` and `plugins/gpt-relay`. |
 
-Or use the CLI:
+Or add the marketplace from the CLI:
 
 ```bash
 codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
-codex plugin add gpt-relay@gpt-relay
 ```
 
-Open a new Codex thread after installation.
+Then install **GPT Relay** from the Codex Plugins UI and open a new Codex thread.
 
 The Add marketplace dialog installs this repository as a custom Codex marketplace source. It is not the same thing as publishing to an official built-in OpenAI marketplace.
 
@@ -40,8 +39,7 @@ plugins/gpt-relay/
   assets/logo.png
 media/
   plugin-install-screen.png
-  gpt-relay-demo-thumbnail.png
-  gpt-relay-demo.mp4
+  gpt-relay-demo.gif
 ```
 
 ## Capabilities
