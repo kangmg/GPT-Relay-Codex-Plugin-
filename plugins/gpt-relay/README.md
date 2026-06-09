@@ -44,7 +44,7 @@ By default this keeps the user's current visible ChatGPT Intelligence selection.
 - Clipboard paste remains only as a fallback for small images when upload is unavailable.
 - Large images do not automatically fall back to native clipboard paste because that can destabilize the Chrome bridge; they return upload permission remediation instead.
 - The helper refuses to send the prompt if ChatGPT does not show a confirmed uploaded or pasted attachment before send.
-- The preferred session store is `~/.codex/gpt-5-5-pro-relay/sessions.json`.
+- The preferred session store is `~/.codex/gpt-relay/sessions.json`.
 - If the runtime cannot write there, it falls back to `nodeRepl.tmpDir`, returns `session.stateWarning`, and later session searches also check that fallback store.
 - May need selector updates if ChatGPT changes its UI.
 - May need Markdown extraction updates if ChatGPT changes its rendered assistant-message DOM.

@@ -2,7 +2,7 @@
 
 日期：2026-06-08
 
-目標插件：`gpt-5-5-pro-relay`
+目標插件：`gpt-relay`
 
 目標：讓插件能可靠判斷 ChatGPT Deep Research 是否已完成，並在完成後自動打開完整報告 viewer，使用右上角匯出選單下載 Markdown 報告，最後把報告保存為可由 Codex 讀取的 artifact。
 
@@ -509,7 +509,7 @@ async function extractDeepResearchReport(tab, state, context) {
 如果下載先落在 `~/Downloads`，應把它複製或移到 session artifact dir：
 
 ```text
-~/.codex/gpt-5-5-pro-relay/artifacts/<session-id>/deep-research-report.md
+~/.codex/gpt-relay/artifacts/<session-id>/deep-research-report.md
 ```
 
 或使用插件目前 `statePath` 相鄰 artifact 目錄。

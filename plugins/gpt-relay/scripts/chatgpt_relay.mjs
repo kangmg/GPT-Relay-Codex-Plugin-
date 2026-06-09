@@ -2432,7 +2432,7 @@ async function pressSystemPaste(tab, composer) {
 
 async function ensureMacosImageClipboardHelper() {
   const tmpDir = globalThis.nodeRepl?.tmpDir || "/tmp";
-  const helperDir = path.join(tmpDir, "gpt-5-5-pro-relay", "native");
+  const helperDir = path.join(tmpDir, "gpt-relay", "native");
   const helperPath = path.join(helperDir, "macos-copy-image-to-clipboard");
   await mkdir(helperDir, { recursive: true });
 
@@ -4629,7 +4629,7 @@ function getStatePath(statePath) {
   return path.join(
     homeDir,
     ".codex",
-    "gpt-5-5-pro-relay",
+    "gpt-relay",
     "sessions.json"
   );
 }
@@ -4643,7 +4643,7 @@ function getFallbackStatePath() {
     );
   }
 
-  return path.join(tmpDir, "gpt-5-5-pro-relay", "sessions.json");
+  return path.join(tmpDir, "gpt-relay", "sessions.json");
 }
 
 function getFallbackStatePathIfAvailable() {

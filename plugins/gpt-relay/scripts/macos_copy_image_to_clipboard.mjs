@@ -27,7 +27,7 @@ async function ensureHelper() {
   const helperDir = path.join(
     "/private",
     "tmp",
-    "gpt-5-5-pro-relay",
+    "gpt-relay",
     "native"
   );
   const helperPath = path.join(helperDir, "macos-copy-image-to-clipboard");

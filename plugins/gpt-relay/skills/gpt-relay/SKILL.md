@@ -38,7 +38,7 @@ If auto-bootstrap fails, report the helper error code and ask the user to ensure
 
 Do not inspect cookies, local storage, passwords, or browser session stores.
 
-The preferred session store is `~/.codex/gpt-5-5-pro-relay/sessions.json`.
+The preferred session store is `~/.codex/gpt-relay/sessions.json`.
 If the runtime cannot write there, the helper falls back to `nodeRepl.tmpDir` and returns `session.stateWarning`; this is degraded persistence, not a relay failure. Later session lookup also checks that fallback store when no explicit `statePath` is supplied.
 
 ## Trigger Handling

@@ -515,7 +515,7 @@ test("relay plugin name alone does not request a model change", () => {
   assert.equal(request.effort, null);
 
   const legacyRequest = __testing.resolveIntelligenceRequest({
-    prompt: "GPT 5.5 Pro Relay create image with a cat",
+    prompt: "GPT Relay create image with a cat",
   });
 
   assert.equal(legacyRequest.explicit, false);

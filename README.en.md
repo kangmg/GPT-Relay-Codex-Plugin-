@@ -10,18 +10,30 @@ Codex is excellent for coding work, local files, and automation. ChatGPT may hav
 
 ## Installation
 
+From the Codex UI:
+
+| Field | Value |
+| --- | --- |
+| Source | `Toolsai/GPT-Relay-Codex-Plugin-` |
+| Git ref | `main` |
+| Sparse paths | Leave blank for normal install. Optional: `.agents/plugins` and `plugins/gpt-relay`. |
+
+Or use the CLI:
+
 ```bash
 codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
-codex plugin add gpt-5-5-pro-relay@gpt-relay
+codex plugin add gpt-relay@gpt-relay
 ```
 
 Open a new Codex thread after installation.
+
+The Add marketplace dialog installs this repository as a custom Codex marketplace source. It is not the same thing as publishing to an official built-in OpenAI marketplace.
 
 ## Repository Layout
 
 ```text
 .agents/plugins/marketplace.json
-plugins/gpt-5-5-pro-relay/
+plugins/gpt-relay/
   .codex-plugin/plugin.json
   skills/gpt-relay/SKILL.md
   scripts/chatgpt_relay.mjs

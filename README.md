@@ -24,11 +24,25 @@ The video below shows Codex calling GPT Relay while Chrome opens ChatGPT, switch
 
 ## Install
 
+### Option A: Install From The Codex UI
+
+In Codex, open **Plugins** → **Manage** → **Create** → **Add marketplace**, then fill in:
+
+| Field | Value |
+| --- | --- |
+| Source | `Toolsai/GPT-Relay-Codex-Plugin-` |
+| Git ref | `main` |
+| Sparse paths | Leave blank for the normal install. Optionally use `.agents/plugins` and `plugins/gpt-relay` if your Codex build asks for sparse checkout paths. |
+
+After adding the marketplace, install **GPT Relay**, then start a new Codex thread.
+
+### Option B: Install From The CLI
+
 Run these commands in your Codex environment:
 
 ```bash
 codex plugin marketplace add Toolsai/GPT-Relay-Codex-Plugin-
-codex plugin add gpt-5-5-pro-relay@gpt-relay
+codex plugin add gpt-relay@gpt-relay
 ```
 
 Then start a new Codex thread so the plugin skill is loaded.
@@ -39,6 +53,17 @@ Then start a new Codex thread so the plugin skill is loaded.
 - Chrome plugin / Chrome automation available in Codex.
 - A logged-in ChatGPT session in Chrome.
 - Your ChatGPT account must have access to the model or mode you request. For example, Pro mode requires a ChatGPT Pro account.
+
+## Marketplace Package
+
+This repository is structured as a Codex plugin marketplace source. Codex needs:
+
+- `.agents/plugins/marketplace.json` at the repository root.
+- `plugins/gpt-relay/.codex-plugin/plugin.json`.
+- The plugin source folder at `plugins/gpt-relay`.
+- A valid Git ref, normally `main`.
+
+The Codex **Add marketplace** dialog adds this repository as a custom marketplace source. It is different from publishing to an official built-in OpenAI marketplace.
 
 ## What It Can Do
 
@@ -71,7 +96,7 @@ To update the marketplace source later:
 
 ```bash
 codex plugin marketplace upgrade gpt-relay
-codex plugin add gpt-5-5-pro-relay@gpt-relay
+codex plugin add gpt-relay@gpt-relay
 ```
 
 Start a new Codex thread after updating.

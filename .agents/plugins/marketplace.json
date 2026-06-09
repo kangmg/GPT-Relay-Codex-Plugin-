@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "gpt-5-5-pro-relay",
+      "name": "gpt-relay",
       "source": {
         "source": "local",
-        "path": "./plugins/gpt-5-5-pro-relay"
+        "path": "./plugins/gpt-relay"
       },
       "policy": {
         "installation": "AVAILABLE",
