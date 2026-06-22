@@ -16,13 +16,6 @@ codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
 
 Then open Codex **Plugins** -> **Manage**, install **GPT Relay**, and start a new Codex thread.
 
-If you already added an older marketplace source, remove it first:
-
-```bash
-codex plugin marketplace remove gpt-relay
-codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
-```
-
 Check the registered marketplace:
 
 ```bash
@@ -34,11 +27,12 @@ codex plugin marketplace list
 From a local checkout, add the folder itself as the marketplace:
 
 ```bash
-codex plugin marketplace remove gpt-relay
 codex plugin marketplace add /absolute/path/to/GPT-Relay-Codex-Plugin-
 ```
 
 Reinstall or update **GPT Relay** from the Codex Plugins UI, then start a new thread. Existing threads may keep using the previously cached plugin.
+
+If you are replacing an older marketplace source, remove that source before adding the new one.
 
 ## Chrome Setup
 

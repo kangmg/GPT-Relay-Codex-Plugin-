@@ -12,21 +12,15 @@ codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
 
 然後到 Codex **Plugins** -> **Manage** 安裝 **GPT Relay**，並開啟新的 Codex thread。
 
-如果之前已經加入舊的 marketplace 來源：
-
-```bash
-codex plugin marketplace remove gpt-relay
-codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
-```
-
 本機開發版本可以直接加入本機資料夾：
 
 ```bash
-codex plugin marketplace remove gpt-relay
 codex plugin marketplace add /absolute/path/to/GPT-Relay-Codex-Plugin-
 ```
 
 切換來源後，請在 Codex Plugins UI 重新安裝或更新插件，並開新 thread。
+
+如果你是在替換舊的 marketplace 來源，請先移除舊來源再加入新的來源。
 
 ## 使用前需要
 

@@ -12,21 +12,15 @@ codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
 
 Then install **GPT Relay** from Codex **Plugins** -> **Manage** and start a new thread.
 
-If an older source is already registered:
-
-```bash
-codex plugin marketplace remove gpt-relay
-codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
-```
-
 For local development:
 
 ```bash
-codex plugin marketplace remove gpt-relay
 codex plugin marketplace add /absolute/path/to/GPT-Relay-Codex-Plugin-
 ```
 
 Reinstall or update the plugin in the Codex UI after changing marketplace sources.
+
+If you are replacing an older marketplace source, remove that source before adding the new one.
 
 ## Requirements
 
