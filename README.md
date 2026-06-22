@@ -1,5 +1,7 @@
 # GPT Relay Codex Plugin
 
+[한국어](./README.ko.md) | [English details](./README.en.md)
+
 GPT Relay lets Codex send a prompt to ChatGPT through your logged-in Chrome session, wait for the answer, and return the result to Codex.
 
 It is useful when you want Codex to use visible ChatGPT web features such as GPT 5.5 Pro, Pro Extended, Deep Research, image generation, web search, or file uploads.
@@ -8,13 +10,15 @@ This is a community plugin, not an official OpenAI or ChatGPT product.
 
 ## Install
 
-Add this repository as a Codex plugin marketplace:
+Clone the repository, then add the local checkout as a Codex plugin marketplace:
 
 ```bash
-codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
+git clone https://github.com/kangmg/GPT-Relay-Codex-Plugin-.git
+codex plugin marketplace add ./GPT-Relay-Codex-Plugin-
+codex plugin add gpt-relay@gpt-relay
 ```
 
-Then open Codex **Plugins** -> **Manage**, install **GPT Relay**, and start a new Codex thread.
+Then start a new Codex thread.
 
 Check the registered marketplace:
 
@@ -22,17 +26,9 @@ Check the registered marketplace:
 codex plugin marketplace list
 ```
 
-## Local Development Install
+## Local Development
 
-From a local checkout, add the folder itself as the marketplace:
-
-```bash
-codex plugin marketplace add /absolute/path/to/GPT-Relay-Codex-Plugin-
-```
-
-Reinstall or update **GPT Relay** from the Codex Plugins UI, then start a new thread. Existing threads may keep using the previously cached plugin.
-
-If you are replacing an older marketplace source, remove that source before adding the new one.
+For a local development checkout, pass the absolute path instead of `./GPT-Relay-Codex-Plugin-`. Existing threads may keep using the previously cached plugin, so start a new thread after reinstalling.
 
 ## Chrome Setup
 
@@ -65,13 +61,14 @@ Switch to GPT 5.4 Thinking Light and analyze this image.
 
 ## Update
 
-For a GitHub marketplace install:
+After pulling updates into the local checkout:
 
 ```bash
-codex plugin marketplace upgrade gpt-relay
+git pull
+codex plugin add gpt-relay@gpt-relay
 ```
 
-Then update or reinstall **GPT Relay** in the Codex Plugins UI and start a new thread.
+Then start a new Codex thread.
 
 ## Notes
 

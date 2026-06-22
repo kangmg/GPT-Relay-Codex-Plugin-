@@ -1,26 +1,27 @@
 # GPT Relay Codex Plugin
 
-[Main README](./README.md) | [中文说明](./README.zh-Hant.md)
+[Main README](./README.md) | [한국어](./README.ko.md)
 
 GPT Relay lets Codex delegate prompts to ChatGPT through your logged-in Chrome session and return the completed answer to Codex.
 
 ## Install
 
 ```bash
-codex plugin marketplace add kangmg/GPT-Relay-Codex-Plugin-
+git clone https://github.com/kangmg/GPT-Relay-Codex-Plugin-.git
+codex plugin marketplace add ./GPT-Relay-Codex-Plugin-
+codex plugin add gpt-relay@gpt-relay
 ```
 
-Then install **GPT Relay** from Codex **Plugins** -> **Manage** and start a new thread.
+Then start a new Codex thread.
 
-For local development:
+For a local development checkout, pass the absolute path instead:
 
 ```bash
 codex plugin marketplace add /absolute/path/to/GPT-Relay-Codex-Plugin-
+codex plugin add gpt-relay@gpt-relay
 ```
 
-Reinstall or update the plugin in the Codex UI after changing marketplace sources.
-
-If you are replacing an older marketplace source, remove that source before adding the new one.
+Existing threads may keep using the previously cached plugin, so start a new thread after reinstalling.
 
 ## Requirements
 
@@ -34,10 +35,11 @@ For local file uploads, enable **Allow access to file URLs** for the Codex Chrom
 ## Update
 
 ```bash
-codex plugin marketplace upgrade gpt-relay
+git pull
+codex plugin add gpt-relay@gpt-relay
 ```
 
-Then update or reinstall **GPT Relay** in the Codex Plugins UI and start a new thread.
+Then start a new Codex thread.
 
 ## Repository Layout
 
