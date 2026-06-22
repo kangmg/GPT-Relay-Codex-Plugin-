@@ -30,6 +30,7 @@ By default this keeps the user's current visible ChatGPT Intelligence selection.
 ## Limits
 
 - Requires the Chrome plugin and a logged-in ChatGPT session.
+- HPC/headless use is available through `scripts/headless_chromium_relay.mjs` with Playwright Chromium and a persistent ChatGPT profile.
 - Stops on login, CAPTCHA, permission, or account prompts.
 - Reports the visible ChatGPT Intelligence selection requested or observed; it does not claim hidden backend state.
 - Pro mode is the paid ChatGPT Pro Intelligence mode and only supports Standard or Extended effort.
@@ -163,3 +164,30 @@ nodeRepl.write(JSON.stringify({
 ```
 
 When `imageMarkdown` is present, paste those Markdown lines into the Codex reply so the generated image renders in the current conversation.
+
+## HPC / Headless Chromium CLI
+
+Install Playwright in the repository checkout:
+
+```bash
+npm install playwright
+npx playwright install chromium
+```
+
+Prepare a persistent ChatGPT profile once in a GUI session:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --login \
+  --profile ~/.cache/gpt-relay/chromium-profile
+```
+
+Run later from SSH or a batch job with the same profile:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --profile ~/.cache/gpt-relay/chromium-profile \
+  --model 5.5 \
+  --mode pro \
+  --prompt "너 무슨 모델이냐?"
+```

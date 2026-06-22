@@ -23,6 +23,35 @@ codex plugin add gpt-relay@gpt-relay
 
 Existing threads may keep using the previously cached plugin, so start a new thread after reinstalling.
 
+## HPC / Headless Chromium
+
+For HPC or SSH-only use, run the relay from the cloned checkout with Playwright Chromium. This mode does not use the Codex Chrome extension, but it still needs a persistent ChatGPT browser profile.
+
+Install Playwright in the checkout:
+
+```bash
+npm install playwright
+npx playwright install chromium
+```
+
+Prepare the ChatGPT profile once in a GUI session such as VNC, NoMachine, or X11:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --login \
+  --profile ~/.cache/gpt-relay/chromium-profile
+```
+
+After login succeeds, reuse the same profile from CLI or a batch job:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --profile ~/.cache/gpt-relay/chromium-profile \
+  --model 5.5 \
+  --mode pro \
+  --prompt "너 무슨 모델이냐?"
+```
+
 ## Requirements
 
 - Codex with plugin support.

@@ -25,6 +25,35 @@ codex plugin add gpt-relay@gpt-relay
 
 기존 thread는 이전 캐시를 계속 쓸 수 있으므로, 재설치 후에는 새 thread를 여는 것이 좋습니다.
 
+## HPC / Headless Chromium
+
+HPC나 SSH 전용 환경에서는 clone한 checkout에서 Playwright Chromium으로 릴레이를 실행할 수 있습니다. 이 모드는 Codex Chrome extension을 쓰지 않지만, ChatGPT에 로그인된 persistent browser profile은 필요합니다.
+
+checkout에서 Playwright를 설치합니다.
+
+```bash
+npm install playwright
+npx playwright install chromium
+```
+
+VNC, NoMachine, X11 같은 GUI 세션에서 한 번 ChatGPT 로그인을 준비합니다.
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --login \
+  --profile ~/.cache/gpt-relay/chromium-profile
+```
+
+로그인이 끝난 뒤에는 같은 profile을 CLI나 batch job에서 재사용합니다.
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
+  --profile ~/.cache/gpt-relay/chromium-profile \
+  --model 5.5 \
+  --mode pro \
+  --prompt "너 무슨 모델이냐?"
+```
+
 ## 요구 사항
 
 - 플러그인을 지원하는 Codex
