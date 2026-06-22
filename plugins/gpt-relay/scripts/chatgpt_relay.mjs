@@ -130,7 +130,7 @@ const REASONING_EFFORT_LABELS = {
   heavy: "Heavy",
 };
 const INTELLIGENCE_ENTRY_BUTTON_RE =
-  /^(?:Extended Pro|Pro|Thinking|Instant|Light|Standard|Extended|Heavy|(?:Light|Standard|Extended|Heavy)\s+(?:Pro|Thinking)|(?:Instant|Thinking|Pro)\s*[•·]\s*(?:Light|Standard|Extended|Heavy)|(?:5\.5|5\.4|5\.3|5\.2|4\.5|o3)\s+(?:Instant|Thinking|Pro)(?:\s+(?:Light|Standard|Extended|Heavy))?)$/i;
+  /^(?:Extended Pro|Pro Extended|Pro|Thinking|Instant|Light|Standard|Extended|Heavy|(?:Light|Standard|Extended|Heavy)\s+(?:Pro|Thinking)|(?:Instant|Thinking|Pro)\s*[•·]\s*(?:Light|Standard|Extended|Heavy)|(?:GPT-?)?(?:5\.5|5\.4|5\.3|5\.2|4\.5|o3)\s+(?:Instant|Thinking|Pro)(?:\s+(?:Light|Standard|Extended|Heavy))?)$/i;
 const INTELLIGENCE_MODEL_VALUE_RE = /^(5\.5|5\.4|5\.3|5\.2|4\.5|o3)$/i;
 const INTELLIGENCE_EFFORT_VALUE_RE = /^(Light|Standard|Extended|Heavy)$/i;
 
@@ -651,6 +651,14 @@ async function selectChatGPTIntelligence(tab, request = DEFAULT_INTELLIGENCE_REQ
     };
   }
 
+  const current = await readCurrentIntelligenceSelectionWithMenu(tab).catch(() => null);
+  if (current && intelligenceSelectionSatisfiesRequest(current, request)) {
+    return {
+      label: current.label,
+      intelligence: current,
+    };
+  }
+
   const configured = await configureChatGPTIntelligence(tab, request);
   return {
     label: configured.label ?? formatIntelligenceLabel(request),
@@ -741,8 +749,73 @@ async function readCurrentIntelligenceSelection(tab) {
   return {
     ...DEFAULT_INTELLIGENCE_REQUEST,
     ...parsed,
+    text,
     label: parsed.label || text || "Current ChatGPT selection",
   };
+}
+
+async function readCurrentIntelligenceSelectionWithMenu(tab) {
+  const current = await readCurrentIntelligenceSelection(tab);
+  const modeControl = await waitForModeControl(tab);
+  if (!modeControl) {
+    return current;
+  }
+
+  await clickModeControl(tab);
+  const menuSelection = await tab.playwright.evaluate(() => {
+    const normalize = (value) => String(value ?? "").trim().replace(/\s+/g, " ");
+    const isVisible = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return (
+        style.visibility !== "hidden" &&
+        style.display !== "none" &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    };
+
+    const entries = [...document.querySelectorAll("[role='menuitemradio'],[role='menuitem']")]
+      .filter(isVisible)
+      .map((element) => ({
+        role: element.getAttribute("role") || "",
+        checked: element.getAttribute("aria-checked") || "",
+        text: normalize(element.innerText || element.textContent),
+      }));
+
+    return {
+      checked: entries.find((entry) => entry.role === "menuitemradio" && entry.checked === "true")?.text ?? "",
+      model: entries.find((entry) => entry.role === "menuitem" && /^(?:GPT-?)?(?:5\.5|5\.4|5\.3|5\.2|4\.5|o3)$/i.test(entry.text))?.text ?? "",
+    };
+  }, undefined, { timeoutMs: 5000 }).catch(() => ({ checked: "", model: "" }));
+
+  await tab.cua?.keypress?.({ keys: ["ESC"] }).catch(() => null);
+  await tab.playwright.waitForTimeout(100);
+
+  const parsed = parseVisibleIntelligenceLabel(
+    [menuSelection.model, menuSelection.checked, current.text].filter(Boolean).join(" ")
+  );
+  parsed.label = formatIntelligenceLabel({
+    ...DEFAULT_INTELLIGENCE_REQUEST,
+    ...parsed,
+  });
+  return {
+    ...current,
+    ...parsed,
+  };
+}
+
+function intelligenceSelectionSatisfiesRequest(selection = {}, request = DEFAULT_INTELLIGENCE_REQUEST) {
+  if (request.model && selection.model !== request.model) {
+    return false;
+  }
+  if (request.mode && selection.mode !== request.mode) {
+    return false;
+  }
+  if (request.effort && selection.effort !== request.effort) {
+    return false;
+  }
+  return true;
 }
 
 async function readConfigureSelection(tab, request = DEFAULT_INTELLIGENCE_REQUEST) {
@@ -927,12 +1000,12 @@ async function locatorText(locator) {
 function parseVisibleIntelligenceLabel(label = "") {
   const text = normalizeWhitespace(label);
   const parsed = {};
-  const modelMatch = text.match(/\b(5\.5|5\.4|5\.3|5\.2|4\.5|o3)\b/i);
+  const modelMatch = text.match(/\b(?:GPT-?)?(5\.5|5\.4|5\.3|5\.2|4\.5|o3)\b/i);
   if (modelMatch) {
     parsed.model = normalizeIntelligenceModel(modelMatch[1]);
   }
 
-  if (/\bExtended Pro\b/i.test(text)) {
+  if (/\b(?:Extended Pro|Pro Extended)\b/i.test(text)) {
     parsed.mode = "pro";
     parsed.effort = "extended";
   } else if (/\bPro\b/i.test(text)) {
@@ -4837,6 +4910,8 @@ export const __testing = {
   isAttachmentUploadBusySignal,
   resolveIntelligenceRequest,
   parseIntelligenceRequestFromPrompt,
+  parseVisibleIntelligenceLabel,
+  intelligenceSelectionSatisfiesRequest,
   formatIntelligenceLabel,
 };
 

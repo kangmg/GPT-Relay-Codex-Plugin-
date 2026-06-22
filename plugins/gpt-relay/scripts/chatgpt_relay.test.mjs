@@ -504,6 +504,24 @@ test("intelligence request parses model, mode, and effort from prompt", () => {
   assert.equal(__testing.formatIntelligenceLabel(request), "5.3 Thinking Light");
 });
 
+test("visible intelligence parser handles current ChatGPT Pro menu labels", () => {
+  const parsed = __testing.parseVisibleIntelligenceLabel("GPT-5.5 Pro Extended");
+
+  assert.equal(parsed.model, "5.5");
+  assert.equal(parsed.mode, "pro");
+  assert.equal(parsed.effort, "extended");
+  assert.equal(__testing.formatIntelligenceLabel(parsed), "5.5 Pro Extended");
+});
+
+test("explicit model request can be satisfied by current visible menu selection", () => {
+  const request = __testing.resolveIntelligenceRequest({
+    prompt: "請用 GPT 5.5 Pro 回答",
+  });
+  const current = __testing.parseVisibleIntelligenceLabel("GPT-5.5 Pro Extended");
+
+  assert.equal(__testing.intelligenceSelectionSatisfiesRequest(current, request), true);
+});
+
 test("relay plugin name alone does not request a model change", () => {
   const request = __testing.resolveIntelligenceRequest({
     prompt: "GPT Relay create image with a cat",
