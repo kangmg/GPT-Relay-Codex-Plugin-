@@ -1,45 +1,86 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { createPlaywrightChromiumBrowser, defaultUserDataDir, expandPath } from "./playwright_chromium_adapter.mjs";
+import { fileURLToPath } from "node:url";
 import { runExtendedProRelay } from "./chatgpt_relay.mjs";
+import { CliError, parseArgs } from "./headless_cli_args.mjs";
+import { helpText, resolveHeadlessConfig } from "./headless_cli_config.mjs";
+import {
+  defaultImportPlaywright,
+  redactSensitiveError,
+  runDoctor,
+  writeDoctorReport,
+} from "./headless_doctor.mjs";
+import { createPlaywrightChromiumBrowser, expandPath } from "./playwright_chromium_adapter.mjs";
+
+export { parseArgs } from "./headless_cli_args.mjs";
+export { helpText, resolveHeadlessConfig } from "./headless_cli_config.mjs";
 
 const CHATGPT_URL = "https://chatgpt.com/";
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function main(options = {}) {
+  const {
+    argv = process.argv.slice(2),
+    env = process.env,
+    stdin = process.stdin,
+    stdout = process.stdout,
+    stderr = process.stderr,
+    createBrowser = createPlaywrightChromiumBrowser,
+    relay = runExtendedProRelay,
+    importPlaywright = defaultImportPlaywright,
+  } = options;
+
+  const args = parseArgs(argv);
   if (args.help) {
-    process.stdout.write(helpText());
-    return;
+    stdout.write(helpText());
+    return 0;
   }
 
-  const profile = expandPath(args.profile ?? args.userDataDir ?? process.env.GPT_RELAY_PROFILE ?? defaultUserDataDir());
-  const statePath = expandPath(args.statePath ?? process.env.GPT_RELAY_STATE ?? path.join(os.homedir(), ".cache", "gpt-relay", "sessions.json"));
-  const headless = args.headed ? false : args.headless !== false;
-  const browser = await createPlaywrightChromiumBrowser({
-    userDataDir: profile,
-    headless,
-    channel: args.channel,
-    executablePath: args.executablePath,
+  const config = resolveHeadlessConfig(args, env);
+  globalThis.__gpt55RelayStatePath = config.statePath;
+
+  if (args.doctor) {
+    const report = await runDoctor(config, {
+      noLaunch: args.noLaunch,
+      createBrowser,
+      importPlaywright,
+    });
+    writeDoctorReport(report, { json: args.json, stdout });
+    return 0;
+  }
+
+  if (config.runtime !== "playwright") {
+    throw new CliError(
+      `headless_chromium_relay.mjs requires runtime 'playwright', received '${config.runtime}'.`,
+      "INVALID_RUNTIME"
+    );
+  }
+
+  let prompt = "";
+  if (!args.login) {
+    prompt = await resolvePrompt(args, stdin);
+    if (!prompt.trim()) {
+      throw new CliError("Prompt is required. Pass --prompt, --prompt-file, positional text, or stdin.", "PROMPT_REQUIRED");
+    }
+  }
+
+  const browser = await createBrowser({
+    userDataDir: config.profilePath,
+    headless: config.headless,
+    channel: config.channel,
+    executablePath: config.executablePath,
+    args: config.browserArgs,
     closeOnFinalize: true,
   });
 
-  globalThis.__gpt55RelayStatePath = statePath;
-
   try {
     if (args.login) {
-      await runLoginFlow(browser, args);
-      return;
+      await runLoginFlow(browser, args, config, stderr, stdout);
+      return 0;
     }
 
-    const prompt = await resolvePrompt(args);
-    if (!prompt.trim()) {
-      throw new Error("Prompt is required. Pass --prompt, --prompt-file, positional text, or stdin.");
-    }
-
-    const result = await runExtendedProRelay({
+    const result = await relay({
       browser,
       prompt,
       model: args.model,
@@ -50,7 +91,7 @@ async function main() {
       appName: args.app,
       attachments: args.attachments.map((entry) => ({ path: expandPath(entry) })),
       keepTab: false,
-      statePath,
+      statePath: config.statePath,
       timeoutMs: args.timeoutMs ?? 6 * 60 * 60 * 1000,
       waitChunkMs: args.waitChunkMs ?? 90000,
       uploadTimeoutMs: args.uploadTimeoutMs ?? 30000,
@@ -58,31 +99,32 @@ async function main() {
     });
 
     if (args.json) {
-      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     } else {
-      process.stdout.write(`${result.finalDeliveryText ?? result.finalResponseText ?? result.assistantText ?? ""}\n`);
+      stdout.write(`${result.finalDeliveryText ?? result.finalResponseText ?? result.assistantText ?? ""}\n`);
     }
+    return 0;
   } finally {
     await browser.close();
   }
 }
 
-async function runLoginFlow(browser, args) {
+async function runLoginFlow(browser, args, config, stderr, stdout) {
   const tab = await browser.tabs.new();
   await tab.goto(CHATGPT_URL);
-  process.stderr.write([
+  stderr.write([
     "Open the Chromium window, log in to ChatGPT, and wait until the composer appears.",
-    `Profile: ${args.profile ?? defaultUserDataDir()}`,
+    `Profile: ${config.profilePath}`,
     "",
   ].join("\n"));
 
   const timeoutMs = args.loginTimeoutMs ?? 10 * 60 * 1000;
   const composer = tab.playwright.getByRole("textbox", { name: "Chat with ChatGPT" });
-  await composer.waitFor({ state: "visible", timeoutMs });
-  process.stdout.write("ChatGPT login profile is ready.\n");
+  await composer.waitFor({ state: "visible", timeout: timeoutMs });
+  stdout.write("ChatGPT login profile is ready.\n");
 }
 
-async function resolvePrompt(args) {
+async function resolvePrompt(args, stdin = process.stdin) {
   if (args.promptFile) {
     return readFile(expandPath(args.promptFile), "utf8");
   }
@@ -92,112 +134,36 @@ async function resolvePrompt(args) {
   if (args.positionals.length > 0) {
     return args.positionals.join(" ");
   }
-  if (!process.stdin.isTTY) {
-    return await readStdin();
+  if (!stdin.isTTY) {
+    return await readStdin(stdin);
   }
   return "";
 }
 
-async function readStdin() {
+async function readStdin(stdin) {
   const chunks = [];
-  for await (const chunk of process.stdin) {
+  for await (const chunk of stdin) {
     chunks.push(Buffer.from(chunk));
   }
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function parseArgs(argv) {
-  const args = {
-    attachments: [],
-    positionals: [],
-    headless: true,
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (!token.startsWith("--")) {
-      args.positionals.push(token);
-      continue;
-    }
-
-    const [rawKey, inlineValue] = token.slice(2).split("=", 2);
-    const key = camelCase(rawKey);
-    const takesValue = !new Set([
-      "help",
-      "headed",
-      "headless",
-      "login",
-      "json",
-      "returnPending",
-    ]).has(key);
-    const value = inlineValue ?? (takesValue ? argv[++index] : true);
-
-    switch (key) {
-      case "help":
-        args.help = true;
-        break;
-      case "headed":
-        args.headed = true;
-        args.headless = false;
-        break;
-      case "headless":
-        args.headless = value === true ? true : !/^(false|0|no)$/i.test(String(value));
-        break;
-      case "login":
-        args.login = true;
-        args.headed = true;
-        args.headless = false;
-        break;
-      case "attachment":
-      case "file":
-        args.attachments.push(value);
-        break;
-      case "timeoutMs":
-      case "waitChunkMs":
-      case "uploadTimeoutMs":
-      case "loginTimeoutMs":
-        args[key] = Number(value);
-        break;
-      case "json":
-      case "returnPending":
-        args[key] = true;
-        break;
-      default:
-        args[key] = value;
-        break;
-    }
-  }
-
-  return args;
+function isDirectRun() {
+  return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 }
 
-function camelCase(value) {
-  return String(value).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+export function formatCliError(error) {
+  const message = redactSensitiveError(error?.message ?? error);
+  return `${error?.code ? `${error.code}: ` : ""}${message}\n`;
 }
 
-function helpText() {
-  return `Usage:
-  node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --login --profile ~/.cache/gpt-relay/chromium-profile
-  node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --profile ~/.cache/gpt-relay/chromium-profile --model 5.5 --mode pro --prompt "너 무슨 모델이냐?"
+export const __testing = {
+  runLoginFlow,
+};
 
-Options:
-  --login                 Open headed Chromium and wait for ChatGPT login.
-  --profile PATH          Persistent Chromium profile directory.
-  --state-path PATH       Session metadata path. Defaults to ~/.cache/gpt-relay/sessions.json.
-  --headed                Run with a visible browser window.
-  --headless=false        Same as --headed.
-  --model VALUE           Visible ChatGPT model, for example 5.5.
-  --mode VALUE            Visible mode: instant, thinking, or pro.
-  --effort VALUE          Reasoning effort, for example standard or extended.
-  --feature VALUE         ChatGPT tool feature: deep-research, create-image, web-search.
-  --attachment PATH       Attach a local file. May be repeated.
-  --prompt TEXT           Prompt text.
-  --prompt-file PATH      Read prompt text from a file.
-  --json                  Print the full relay result JSON.
-`;
+if (isDirectRun()) {
+  main().catch((error) => {
+    process.stderr.write(formatCliError(error));
+    process.exitCode = 1;
+  });
 }
-
-main().catch((error) => {
-  process.stderr.write(`${error?.code ? `${error.code}: ` : ""}${error?.message ?? error}\n`);
-  process.exitCode = 1;
-});

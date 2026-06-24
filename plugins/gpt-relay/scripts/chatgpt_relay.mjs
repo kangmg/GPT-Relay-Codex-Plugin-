@@ -3,6 +3,12 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import {
+  createPlaywrightChromiumBrowser,
+  defaultUserDataDir,
+  expandPath,
+  playwrightMissingError,
+} from "./playwright_chromium_adapter.mjs";
 
 const CHATGPT_URL = "https://chatgpt.com/";
 const DEFAULT_TIMEOUT_MS = 6 * 60 * 60 * 1000;
@@ -21,6 +27,7 @@ const GENERATED_IMAGE_MIN_EDGE = 128;
 const GENERATED_IMAGE_MIN_AREA = 30000;
 const DEEP_RESEARCH_REPORT_MIN_BYTES = 5000;
 const DEEP_RESEARCH_DOWNLOAD_WINDOW_MS = 60000;
+const DEFAULT_RELAY_RUNTIME = "chrome";
 const CODEX_UPLOAD_PERMISSION_FIX =
   "Codex Settings > Computer Use > Chrome > Permissions > Uploads: set to Always allow, or add chatgpt.com to the allowed upload domains.";
 const CHROME_FILE_URL_PERMISSION_FIX =
@@ -147,7 +154,9 @@ export async function startExtendedProRelay(options = {}) {
 }
 
 export async function continueExtendedProRelay(options = {}) {
-  const { sessionId, query, statePath } = options;
+  const runtimeConfig = resolveRelayRuntimeConfig(options);
+  const { sessionId, query } = options;
+  const statePath = runtimeConfig.statePath;
   const session = await findStoredSession({ sessionId, query, statePath });
 
   if (!session) {
@@ -165,14 +174,14 @@ export async function continueExtendedProRelay(options = {}) {
 }
 
 export async function pollRelaySession(options = {}) {
+  const runtimeConfig = resolveRelayRuntimeConfig(options);
   const {
-    browser: requestedBrowser,
     sessionId,
     query,
-    statePath,
     keepTab = true,
     timeoutMs = DEFAULT_POLL_TIMEOUT_MS,
   } = options;
+  const statePath = runtimeConfig.statePath;
 
   const session = await findStoredSession({ sessionId, query, statePath });
 
@@ -183,7 +192,8 @@ export async function pollRelaySession(options = {}) {
     );
   }
 
-  const browser = await resolveBrowser(requestedBrowser);
+  const browserLease = await resolveBrowserLease(options, process.env, runtimeConfig);
+  const { browser } = browserLease;
   let tab;
 
   try {
@@ -264,12 +274,13 @@ export async function pollRelaySession(options = {}) {
       messages: state.messages,
     };
   } finally {
-    await finalizeRelayTab(browser, tab, keepTab);
+    await finalizeBrowserLease(browserLease, tab, keepTab);
   }
 }
 
 export async function listRelaySessions(options = {}) {
-  const { query = "", limit = 20, statePath } = options;
+  const { query = "", limit = 20 } = options;
+  const statePath = resolveRelayRuntimeConfig(options).statePath;
   const store = await loadSessionStore(statePath);
   return filterSessions(store.sessions, query)
     .slice(0, limit)
@@ -277,13 +288,13 @@ export async function listRelaySessions(options = {}) {
 }
 
 export async function getRelaySession(options = {}) {
-  const session = await findStoredSession(options);
+  const statePath = resolveRelayRuntimeConfig(options).statePath;
+  const session = await findStoredSession({ ...options, statePath });
   return session ? publicSession(session) : null;
 }
 
 async function relayPrompt(options = {}) {
   const {
-    browser: requestedBrowser,
     prompt,
     conversationUrl,
     sessionId,
@@ -293,7 +304,6 @@ async function relayPrompt(options = {}) {
     timeoutMs = DEFAULT_TIMEOUT_MS,
     waitChunkMs = DEFAULT_WAIT_CHUNK_MS,
     returnPending = false,
-    statePath,
     model: requestedModel,
     mode: requestedMode,
     intelligenceMode,
@@ -315,13 +325,16 @@ async function relayPrompt(options = {}) {
     throw codedError("PROMPT_MISSING", "A non-empty prompt is required.");
   }
 
-  const browser = await resolveBrowser(requestedBrowser);
+  const runtimeConfig = resolveRelayRuntimeConfig(options);
+  const statePath = runtimeConfig.statePath;
   const intelligenceRequest = resolveIntelligenceRequest({
     prompt,
     model: requestedModel,
     mode: intelligenceMode ?? reasoningMode ?? thinkingMode ?? requestedMode,
     effort: reasoningEffort ?? thinkingEffort ?? proEffort ?? effort,
   });
+  const browserLease = await resolveBrowserLease(options, process.env, runtimeConfig);
+  const { browser } = browserLease;
   let tab;
   let mode = formatIntelligenceLabel(intelligenceRequest);
   let effectiveIntelligence = intelligenceRequest;
@@ -474,13 +487,130 @@ async function relayPrompt(options = {}) {
       messages: state.messages,
     };
   } finally {
-    await finalizeRelayTab(browser, tab, keepTab);
+    await finalizeBrowserLease(browserLease, tab, keepTab);
   }
 }
 
-async function resolveBrowser(requestedBrowser) {
-  if (requestedBrowser) {
-    return requestedBrowser;
+function resolveRelayRuntimeConfig(options = {}, env = process.env) {
+  const runtime = normalizeRelayRuntime(firstConfiguredValue(
+    options.runtime,
+    env.GPT_RELAY_RUNTIME,
+    DEFAULT_RELAY_RUNTIME
+  ));
+  const profileValue = firstConfiguredValue(
+    options.profile,
+    options.userDataDir,
+    env.GPT_RELAY_PROFILE,
+    runtime === "playwright" ? defaultUserDataDir() : undefined
+  );
+  const statePathValue = firstConfiguredValue(
+    options.statePath,
+    env.GPT_RELAY_STATE,
+    runtime === "playwright" ? defaultPlaywrightStatePath() : undefined
+  );
+
+  const profile = expandConfiguredPath(profileValue);
+  const statePath = expandConfiguredPath(statePathValue);
+
+  return {
+    runtime,
+    profile,
+    userDataDir: profile,
+    statePath,
+    channel: optionalString(firstConfiguredValue(
+      options.channel,
+      env.GPT_RELAY_CHROMIUM_CHANNEL
+    )),
+    executablePath: optionalString(firstConfiguredValue(
+      options.executablePath,
+      env.GPT_RELAY_CHROMIUM_EXECUTABLE
+    )),
+    headless: normalizeHeadless(firstConfiguredValue(
+      options.headless,
+      env.GPT_RELAY_HEADLESS,
+      true
+    )),
+    browserArgs: normalizeBrowserArgs(firstConfiguredValue(
+      options.browserArgs,
+      env.GPT_RELAY_CHROMIUM_ARGS
+    )),
+  };
+}
+
+async function resolveBrowserLease(
+  options = {},
+  env = process.env,
+  runtimeConfig = resolveRelayRuntimeConfig(options, env)
+) {
+  if (options.browser) {
+    return {
+      browser: options.browser,
+      helperOwned: false,
+      runtime: runtimeConfig.runtime,
+      statePath: runtimeConfig.statePath,
+    };
+  }
+
+  if (runtimeConfig.runtime === "playwright") {
+    return {
+      browser: await createPlaywrightBrowser(runtimeConfig, options),
+      helperOwned: true,
+      runtime: "playwright",
+      statePath: runtimeConfig.statePath,
+    };
+  }
+
+  return {
+    browser: await resolveChromeExtensionBrowser(options.chromeBrowserFactory),
+    helperOwned: false,
+    runtime: "chrome",
+    statePath: runtimeConfig.statePath,
+  };
+}
+
+async function createPlaywrightBrowser(runtimeConfig, options = {}) {
+  const factory = options.playwrightFactory ?? createPlaywrightChromiumBrowser;
+  const browserOptions = {
+    userDataDir: runtimeConfig.profile,
+    headless: runtimeConfig.headless,
+    args: runtimeConfig.browserArgs,
+    closeOnFinalize: true,
+  };
+
+  if (runtimeConfig.channel) {
+    browserOptions.channel = runtimeConfig.channel;
+  }
+  if (runtimeConfig.executablePath) {
+    browserOptions.executablePath = runtimeConfig.executablePath;
+  }
+  if (options.playwright) {
+    browserOptions.playwright = options.playwright;
+  }
+
+  try {
+    return await factory(browserOptions);
+  } catch (error) {
+    throw normalizePlaywrightCreationError(error);
+  }
+}
+
+function normalizePlaywrightCreationError(error) {
+  if (error?.code === "PLAYWRIGHT_MISSING") {
+    return error;
+  }
+  if (
+    error?.code === "ERR_MODULE_NOT_FOUND" ||
+    error?.code === "MODULE_NOT_FOUND" ||
+    /Cannot find package ['"]playwright['"]/.test(String(error?.message ?? ""))
+  ) {
+    return playwrightMissingError(error);
+  }
+  return error;
+}
+
+async function resolveChromeExtensionBrowser(chromeBrowserFactory) {
+  if (chromeBrowserFactory) {
+    return chromeBrowserFactory();
   }
 
   if (globalThis.browser) {
@@ -513,6 +643,80 @@ async function resolveBrowser(requestedBrowser) {
   await connectedBrowser.documentation();
 
   return connectedBrowser;
+}
+
+async function finalizeBrowserLease(browserLease, tab, keepTab) {
+  await finalizeRelayTab(browserLease?.browser, tab, keepTab);
+
+  if (
+    browserLease?.helperOwned &&
+    !browserLease.browser?.tabs?.finalize &&
+    typeof browserLease.browser?.close === "function"
+  ) {
+    await browserLease.browser.close();
+  }
+}
+
+function normalizeRelayRuntime(value) {
+  const runtime = String(value ?? "").trim().toLowerCase() || DEFAULT_RELAY_RUNTIME;
+  if (runtime === "chrome" || runtime === "playwright") {
+    return runtime;
+  }
+  throw codedError(
+    "RELAY_RUNTIME_INVALID",
+    "GPT Relay runtime must be either \"chrome\" or \"playwright\"."
+  );
+}
+
+function normalizeHeadless(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const text = String(value ?? "").trim().toLowerCase();
+  if (!text) {
+    return true;
+  }
+  if (["1", "true", "yes", "y", "on", "headless"].includes(text)) {
+    return true;
+  }
+  if (["0", "false", "no", "n", "off", "headed"].includes(text)) {
+    return false;
+  }
+  throw codedError(
+    "RELAY_RUNTIME_INVALID",
+    "GPT_RELAY_HEADLESS must be true/false, yes/no, 1/0, on/off, headless, or headed."
+  );
+}
+
+function normalizeBrowserArgs(value) {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+  return String(value).trim().split(/\s+/).filter(Boolean);
+}
+
+function firstConfiguredValue(...values) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+function optionalString(value) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  return text ? text : undefined;
+}
+
+function expandConfiguredPath(value) {
+  const text = optionalString(value);
+  return text ? expandPath(text) : undefined;
+}
+
+function defaultPlaywrightStatePath() {
+  return path.join(path.dirname(defaultUserDataDir()), "sessions.json");
 }
 
 async function findBrowserClientModule() {
@@ -4690,6 +4894,11 @@ function getStatePath(statePath) {
     return statePath;
   }
 
+  const envStatePath = expandConfiguredPath(process.env.GPT_RELAY_STATE);
+  if (envStatePath) {
+    return envStatePath;
+  }
+
   if (globalThis.__gpt55RelayStatePath) {
     return globalThis.__gpt55RelayStatePath;
   }
@@ -4913,6 +5122,9 @@ export const __testing = {
   parseVisibleIntelligenceLabel,
   intelligenceSelectionSatisfiesRequest,
   formatIntelligenceLabel,
+  resolveRelayRuntimeConfig,
+  resolveBrowserLease,
+  finalizeBrowserLease,
 };
 
 function codedError(code, message, extra = {}) {

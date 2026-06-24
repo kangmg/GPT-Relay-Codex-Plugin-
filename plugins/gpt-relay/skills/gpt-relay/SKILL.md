@@ -5,7 +5,7 @@ description: Use when the user asks to use GPT 5.5 Pro, 5.5 pro, GPT 5.5, Extend
 
 # GPT Relay
 
-This skill relays a Codex task to ChatGPT through the user's existing Chrome session.
+This skill relays a Codex task to ChatGPT through the user's existing Chrome session by default, or through Playwright Chromium when a server/headless runtime is explicitly selected.
 By default it keeps the user's current visible ChatGPT Intelligence selection. Only change the
 model, mode, or effort when the user explicitly requests a visible combination such as
 `5.5 Pro extended`, `5.5 Thinking light`, or `5.4 Instant`.
@@ -31,15 +31,56 @@ Use the helper script at `../../scripts/chatgpt_relay.mjs` to:
 
 ## Required Setup
 
-This skill depends on the Chrome plugin and its browser-client runtime.
+This skill has two runtime paths:
+
+1. Chrome extension/browser-client runtime: the default for local plugin and skill use.
+2. Playwright headless runtime: available for server, SSH, CLI, batch, and explicit helper runtime selection.
+
+For the default Chrome path, this skill depends on the Chrome plugin and its browser-client runtime.
 
 The helper auto-bootstraps the bundled Chrome plugin when `globalThis.browser` is missing.
 If auto-bootstrap fails, report the helper error code and ask the user to ensure the Chrome plugin is installed and the Codex Chrome extension is connected.
 
+For the Playwright headless path, package setup is done from the repository root:
+
+```bash
+npm install
+npx playwright install --with-deps chromium
+```
+
+Check server readiness without sending a prompt or opening ChatGPT:
+
+```bash
+npm run headless:doctor -- --json --no-launch
+```
+
+The direct CLI is:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs
+```
+
+The default persistent Playwright profile is `~/.cache/gpt-relay/chromium-profile`, and the default headless session state file is `~/.cache/gpt-relay/sessions.json`. Prepare the profile once with `--login` in a GUI-capable session such as VNC, NoMachine, X11, or a local desktop. First-time ChatGPT login, CAPTCHA, payment, permission, and account prompts are not bypassed or automated. After login succeeds, the same persistent profile can be reused from SSH or batch jobs, but do not use the same profile concurrently in simultaneous relay processes.
+
+Runtime/config environment variables:
+
+- `GPT_RELAY_RUNTIME=chrome|playwright`
+- `GPT_RELAY_PROFILE`
+- `GPT_RELAY_STATE`
+- `GPT_RELAY_CHROMIUM_CHANNEL`
+- `GPT_RELAY_CHROMIUM_EXECUTABLE`
+- `GPT_RELAY_HEADLESS`
+- `GPT_RELAY_CHROMIUM_ARGS`
+
+The helper can also take explicit runtime options. Options override environment values. Use `runtime: "playwright"` only when the Playwright profile has been prepared and the user asked for server/headless behavior; otherwise keep the Chrome-extension default.
+
+The headless CLI supports `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, and `--login`. Do not recommend `--no-sandbox` by default. Risky explicit Chromium arguments are operator-owned, and doctor mode warns about them.
+
 Do not inspect cookies, local storage, passwords, or browser session stores.
 
-The preferred session store is `~/.codex/gpt-relay/sessions.json`.
-If the runtime cannot write there, the helper falls back to `nodeRepl.tmpDir` and returns `session.stateWarning`; this is degraded persistence, not a relay failure. Later session lookup also checks that fallback store when no explicit `statePath` is supplied.
+Chrome-extension mode defaults to `~/.codex/gpt-relay/sessions.json`; Playwright headless mode defaults to `~/.cache/gpt-relay/sessions.json`.
+Set `statePath` or `GPT_RELAY_STATE` to share one explicit session store across runtimes.
+If the Chrome-extension runtime cannot write its default store, the helper falls back to `nodeRepl.tmpDir` and returns `session.stateWarning`; this is degraded persistence, not a relay failure. Later session lookup also checks that fallback store when no explicit `statePath` is supplied.
 
 ## Trigger Handling
 
@@ -93,6 +134,21 @@ const result = await runExtendedProRelay({
   waitChunkMs: 90000,
   timeoutMs: 6 * 60 * 60 * 1000,
   returnPending: false
+});
+nodeRepl.write(result.finalDeliveryText ?? result.finalResponseText);
+```
+
+Explicit Playwright headless runtime selection:
+
+```js
+const { runExtendedProRelay } = await import("/absolute/path/to/plugin/scripts/chatgpt_relay.mjs");
+const result = await runExtendedProRelay({
+  runtime: "playwright",
+  profile: "~/.cache/gpt-relay/chromium-profile",
+  statePath: "~/.cache/gpt-relay/sessions.json",
+  prompt: "User prompt here",
+  keepTab: false,
+  timeoutMs: 30 * 60 * 1000
 });
 nodeRepl.write(result.finalDeliveryText ?? result.finalResponseText);
 ```

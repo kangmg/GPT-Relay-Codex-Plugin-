@@ -3,7 +3,317 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { __testing } from "./chatgpt_relay.mjs";
+import {
+  __testing,
+  getRelaySession,
+  listRelaySessions,
+} from "./chatgpt_relay.mjs";
+import { createPlaywrightChromiumBrowser } from "./playwright_chromium_adapter.mjs";
+
+test("runtime selection defaults to Chrome without creating Playwright", async () => {
+  let chromeFactoryCalled = 0;
+  let playwrightFactoryCalled = 0;
+  const chromeBrowser = { runtime: "chrome-extension" };
+
+  const lease = await __testing.resolveBrowserLease(
+    {
+      chromeBrowserFactory: async () => {
+        chromeFactoryCalled += 1;
+        return chromeBrowser;
+      },
+      playwrightFactory: async () => {
+        playwrightFactoryCalled += 1;
+        throw new Error("Playwright should not be created for the default runtime.");
+      },
+    },
+    {}
+  );
+
+  assert.equal(lease.runtime, "chrome");
+  assert.equal(lease.browser, chromeBrowser);
+  assert.equal(lease.helperOwned, false);
+  assert.equal(chromeFactoryCalled, 1);
+  assert.equal(playwrightFactoryCalled, 0);
+});
+
+test("runtime selection resolves options before environment defaults", () => {
+  const config = __testing.resolveRelayRuntimeConfig(
+    {
+      runtime: "chrome",
+      profile: "~/option-profile",
+      statePath: "~/option-state.json",
+      headless: true,
+      browserArgs: ["--option-arg"],
+    },
+    {
+      GPT_RELAY_RUNTIME: "playwright",
+      GPT_RELAY_PROFILE: "~/env-profile",
+      GPT_RELAY_STATE: "~/env-state.json",
+      GPT_RELAY_HEADLESS: "false",
+      GPT_RELAY_CHROMIUM_ARGS: "--env-arg",
+    }
+  );
+
+  assert.equal(config.runtime, "chrome");
+  assert.equal(config.profile, path.join(os.homedir(), "option-profile"));
+  assert.equal(config.statePath, path.join(os.homedir(), "option-state.json"));
+  assert.equal(config.headless, true);
+  assert.deepEqual(config.browserArgs, ["--option-arg"]);
+
+  const envConfig = __testing.resolveRelayRuntimeConfig(
+    {},
+    {
+      GPT_RELAY_RUNTIME: "playwright",
+      GPT_RELAY_PROFILE: "~/env-profile",
+      GPT_RELAY_STATE: "~/env-state.json",
+      GPT_RELAY_CHROMIUM_CHANNEL: "chrome",
+      GPT_RELAY_CHROMIUM_EXECUTABLE: "/tmp/chromium",
+      GPT_RELAY_HEADLESS: "0",
+      GPT_RELAY_CHROMIUM_ARGS: "--disable-gpu --window-size=1280,900",
+    }
+  );
+
+  assert.equal(envConfig.runtime, "playwright");
+  assert.equal(envConfig.profile, path.join(os.homedir(), "env-profile"));
+  assert.equal(envConfig.statePath, path.join(os.homedir(), "env-state.json"));
+  assert.equal(envConfig.channel, "chrome");
+  assert.equal(envConfig.executablePath, "/tmp/chromium");
+  assert.equal(envConfig.headless, false);
+  assert.deepEqual(envConfig.browserArgs, ["--disable-gpu", "--window-size=1280,900"]);
+});
+
+test("session lookup uses the Playwright default state path for headless runtime", async (t) => {
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "gpt55-relay-home-"));
+  const statePath = path.join(homeDir, ".cache", "gpt-relay", "sessions.json");
+  await mkdir(path.dirname(statePath), { recursive: true });
+  await writeFile(statePath, JSON.stringify({
+    version: 1,
+    sessions: [
+      {
+        relaySessionId: "headless-1",
+        conversationId: "abc123",
+        conversationUrl: "https://chatgpt.com/c/abc123",
+        title: "Headless session",
+        status: "pending",
+        mode: "Extended Pro",
+        updatedAt: "2026-06-24T00:00:00.000Z",
+        createdAt: "2026-06-24T00:00:00.000Z",
+      },
+    ],
+  }));
+
+  const previousRuntime = process.env.GPT_RELAY_RUNTIME;
+  const previousState = process.env.GPT_RELAY_STATE;
+  const previousNodeRepl = globalThis.nodeRepl;
+  const previousRelayStatePath = globalThis.__gpt55RelayStatePath;
+  t.mock.method(os, "homedir", () => homeDir);
+  process.env.GPT_RELAY_RUNTIME = "playwright";
+  delete process.env.GPT_RELAY_STATE;
+  globalThis.nodeRepl = {
+    ...(previousNodeRepl ?? {}),
+    homeDir,
+    tmpDir: path.join(homeDir, "tmp"),
+  };
+  delete globalThis.__gpt55RelayStatePath;
+
+  try {
+    const sessions = await listRelaySessions({});
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].relaySessionId, "headless-1");
+
+    const session = await getRelaySession({ sessionId: "headless-1" });
+    assert.equal(session?.conversationUrl, "https://chatgpt.com/c/abc123");
+  } finally {
+    if (previousRuntime === undefined) {
+      delete process.env.GPT_RELAY_RUNTIME;
+    } else {
+      process.env.GPT_RELAY_RUNTIME = previousRuntime;
+    }
+    if (previousState === undefined) {
+      delete process.env.GPT_RELAY_STATE;
+    } else {
+      process.env.GPT_RELAY_STATE = previousState;
+    }
+    if (previousNodeRepl === undefined) {
+      delete globalThis.nodeRepl;
+    } else {
+      globalThis.nodeRepl = previousNodeRepl;
+    }
+    if (previousRelayStatePath === undefined) {
+      delete globalThis.__gpt55RelayStatePath;
+    } else {
+      globalThis.__gpt55RelayStatePath = previousRelayStatePath;
+    }
+  }
+});
+
+test("runtime selection creates Playwright with injected factory profile and state", async () => {
+  const playwrightBrowser = { runtime: "playwright-chromium" };
+  let capturedOptions;
+
+  const lease = await __testing.resolveBrowserLease(
+    {
+      runtime: "playwright",
+      profile: "~/relay-profile",
+      statePath: "~/relay-state.json",
+      channel: "chrome",
+      executablePath: "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      headless: false,
+      browserArgs: ["--disable-gpu"],
+      playwrightFactory: async (factoryOptions) => {
+        capturedOptions = factoryOptions;
+        return playwrightBrowser;
+      },
+    },
+    {}
+  );
+
+  assert.equal(lease.runtime, "playwright");
+  assert.equal(lease.browser, playwrightBrowser);
+  assert.equal(lease.helperOwned, true);
+  assert.equal(lease.statePath, path.join(os.homedir(), "relay-state.json"));
+  assert.deepEqual(capturedOptions, {
+    userDataDir: path.join(os.homedir(), "relay-profile"),
+    headless: false,
+    channel: "chrome",
+    executablePath: "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    args: ["--disable-gpu"],
+    closeOnFinalize: true,
+  });
+});
+
+test("missing Playwright runtime reports server install remediation", async () => {
+  let chromeFactoryCalled = 0;
+
+  await assert.rejects(
+    () => __testing.resolveBrowserLease(
+      {
+        runtime: "playwright",
+        chromeBrowserFactory: async () => {
+          chromeFactoryCalled += 1;
+          return { runtime: "chrome-extension" };
+        },
+        playwrightFactory: async () => {
+          const error = new Error("Cannot find package 'playwright'");
+          error.code = "ERR_MODULE_NOT_FOUND";
+          throw error;
+        },
+      },
+      {}
+    ),
+    (error) => {
+      assert.equal(error.code, "PLAYWRIGHT_MISSING");
+      assert.match(error.message, /npm install/);
+      assert.match(error.message, /npx playwright install --with-deps chromium/);
+      return true;
+    }
+  );
+
+  assert.equal(chromeFactoryCalled, 0);
+});
+
+test("Playwright Chromium adapter enables Chromium sandbox by default", async () => {
+  let launchOptions;
+  const context = {
+    async grantPermissions() {},
+    async close() {},
+    async newPage() {
+      throw new Error("not used");
+    },
+  };
+  await createPlaywrightChromiumBrowser({
+    userDataDir: "~/sandbox-profile",
+    playwright: {
+      chromium: {
+        async launchPersistentContext(_userDataDir, options) {
+          launchOptions = options;
+          return context;
+        },
+      },
+    },
+  });
+
+  assert.equal(launchOptions.chromiumSandbox, true);
+  assert.equal(launchOptions.args.includes("--no-sandbox"), false);
+});
+
+test("runtime selection finalizer closes helper-owned browsers but not caller-owned browsers", async () => {
+  let helperFinalized = 0;
+  let helperClosed = 0;
+  let helperCloseOnlyClosed = 0;
+  let callerFinalized = 0;
+  let callerClosed = 0;
+  let callerCloseOnlyClosed = 0;
+
+  await __testing.finalizeBrowserLease(
+    {
+      helperOwned: true,
+      browser: {
+        tabs: {
+          async finalize() {
+            helperFinalized += 1;
+          },
+        },
+        async close() {
+          helperClosed += 1;
+        },
+      },
+    },
+    null,
+    false
+  );
+
+  await __testing.finalizeBrowserLease(
+    {
+      helperOwned: true,
+      browser: {
+        async close() {
+          helperCloseOnlyClosed += 1;
+        },
+      },
+    },
+    null,
+    false
+  );
+
+  await __testing.finalizeBrowserLease(
+    {
+      helperOwned: false,
+      browser: {
+        tabs: {
+          async finalize() {
+            callerFinalized += 1;
+          },
+        },
+        async close() {
+          callerClosed += 1;
+        },
+      },
+    },
+    null,
+    false
+  );
+
+  await __testing.finalizeBrowserLease(
+    {
+      helperOwned: false,
+      browser: {
+        async close() {
+          callerCloseOnlyClosed += 1;
+        },
+      },
+    },
+    null,
+    false
+  );
+
+  assert.equal(helperFinalized, 1);
+  assert.equal(helperClosed, 0);
+  assert.equal(helperCloseOnlyClosed, 1);
+  assert.equal(callerFinalized, 1);
+  assert.equal(callerClosed, 0);
+  assert.equal(callerCloseOnlyClosed, 0);
+});
 
 test("prepareAttachment uses upload metadata for images by default", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "gpt55-relay-test-"));

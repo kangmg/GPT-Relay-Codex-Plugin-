@@ -27,6 +27,7 @@ export async function createPlaywrightChromiumBrowser(options = {}) {
       executablePath,
       viewport,
       acceptDownloads,
+      chromiumSandbox: true,
       args: [
         "--disable-dev-shm-usage",
         "--no-first-run",
@@ -121,16 +122,20 @@ export function expandPath(value) {
   return path.resolve(input);
 }
 
+export function playwrightMissingError(cause) {
+  const wrapped = new Error(
+    "Playwright is not installed. Run `npm install` and `npx playwright install --with-deps chromium` in the checkout before using the headless Chromium relay."
+  );
+  wrapped.code = "PLAYWRIGHT_MISSING";
+  wrapped.cause = cause;
+  return wrapped;
+}
+
 async function importPlaywright() {
   try {
     return await import("playwright");
   } catch (error) {
-    const wrapped = new Error(
-      "Playwright is not installed. Run `npm install playwright` and `npx playwright install chromium` in the checkout before using the headless Chromium relay."
-    );
-    wrapped.code = "PLAYWRIGHT_MISSING";
-    wrapped.cause = error;
-    throw wrapped;
+    throw playwrightMissingError(error);
   }
 }
 

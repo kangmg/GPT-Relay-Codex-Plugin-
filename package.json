@@ -1,0 +1,15 @@
+{
+  "name": "gpt-relay-codex-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check plugins/gpt-relay/scripts/chatgpt_relay.mjs && node --check plugins/gpt-relay/scripts/headless_chromium_relay.mjs && node --check plugins/gpt-relay/scripts/headless_cli_args.mjs && node --check plugins/gpt-relay/scripts/headless_cli_config.mjs && node --check plugins/gpt-relay/scripts/headless_doctor.mjs && node --check plugins/gpt-relay/scripts/playwright_chromium_adapter.mjs",
+    "test": "node --test plugins/gpt-relay/scripts/chatgpt_relay.test.mjs plugins/gpt-relay/scripts/headless_chromium_relay.test.mjs",
+    "headless:help": "node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --help",
+    "headless:doctor": "node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --doctor"
+  },
+  "devDependencies": {
+    "playwright": "1.61.0"
+  }
+}

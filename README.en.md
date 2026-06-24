@@ -27,11 +27,23 @@ Existing threads may keep using the previously cached plugin, so start a new thr
 
 For HPC or SSH-only use, run the relay from the cloned checkout with Playwright Chromium. This mode does not use the Codex Chrome extension, but it still needs a persistent ChatGPT browser profile.
 
-Install Playwright in the checkout:
+Install package dependencies from the repository root, then install the Chromium browser and Linux system dependencies Playwright needs:
 
 ```bash
-npm install playwright
-npx playwright install chromium
+npm install
+npx playwright install --with-deps chromium
+```
+
+Check the server configuration without opening ChatGPT:
+
+```bash
+npm run headless:doctor -- --json --no-launch
+```
+
+The equivalent direct CLI is:
+
+```bash
+node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --doctor --json --no-launch
 ```
 
 Prepare the ChatGPT profile once in a GUI session such as VNC, NoMachine, or X11:
@@ -42,7 +54,9 @@ node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
   --profile ~/.cache/gpt-relay/chromium-profile
 ```
 
-After login succeeds, reuse the same profile from CLI or a batch job:
+First-time ChatGPT login, CAPTCHA, account, and permission prompts are not bypassed or automated. Complete them in a GUI-capable session such as VNC, NoMachine, X11, or a local desktop. The default persistent profile is `~/.cache/gpt-relay/chromium-profile`, and the default session state file is `~/.cache/gpt-relay/sessions.json`.
+
+After login succeeds, reuse the same persistent profile from SSH, CLI, or a batch job. Do not use the same profile concurrently in simultaneous relay processes.
 
 ```bash
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
@@ -51,6 +65,10 @@ node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
   --mode pro \
   --prompt "너 무슨 모델이냐?"
 ```
+
+Runtime selection and paths can be configured with `GPT_RELAY_RUNTIME=chrome|playwright`, `GPT_RELAY_PROFILE`, `GPT_RELAY_STATE`, `GPT_RELAY_CHROMIUM_CHANNEL`, `GPT_RELAY_CHROMIUM_EXECUTABLE`, `GPT_RELAY_HEADLESS`, and `GPT_RELAY_CHROMIUM_ARGS`. Chrome-extension mode remains the default for plugin and skill use; Playwright headless is available for server/CLI use and explicit helper runtime selection.
+
+CLI options include `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, and `--login`. The relay does not recommend `--no-sandbox` by default; risky explicit browser arguments are operator-owned, and doctor mode warns about them.
 
 ## Requirements
 

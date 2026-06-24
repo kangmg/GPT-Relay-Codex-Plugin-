@@ -5,3 +5,4 @@ dist/
 tmp/
 relay_uploads/
 *.local.*
+.omo/
