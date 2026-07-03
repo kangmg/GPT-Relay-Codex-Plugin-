@@ -1,6 +1,6 @@
 # GPT Relay
 
-Local Codex plugin prototype for relaying prompts to ChatGPT through the user's Chrome session or, for server use, through Playwright Chromium with a prepared persistent profile.
+Local Codex plugin prototype for relaying prompts to ChatGPT through the user's Chrome session or, for server use, through CloakBrowser Chromium with a prepared persistent profile.
 
 By default this keeps the user's current visible ChatGPT Intelligence selection. Callers can request visible ChatGPT Intelligence combinations such as `5.5 Pro extended`, `5.5 Thinking light`, or `5.4 Instant`.
 
@@ -30,8 +30,8 @@ By default this keeps the user's current visible ChatGPT Intelligence selection.
 ## Limits
 
 - Requires the Chrome plugin and a logged-in ChatGPT session.
-- HPC/headless use is available through `scripts/headless_chromium_relay.mjs` with Playwright Chromium and a persistent ChatGPT profile.
-- Chrome-extension mode remains the default for plugin and skill local use; Playwright headless is available for server/CLI use and explicit helper runtime selection.
+- HPC/headless use is available through `scripts/headless_chromium_relay.mjs` with CloakBrowser Chromium and a persistent ChatGPT profile.
+- Chrome-extension mode remains the default for plugin and skill local use; CloakBrowser Chromium is the only server/CLI runtime.
 - Stops on login, CAPTCHA, permission, or account prompts.
 - First-time login/profile preparation needs a GUI-capable session such as VNC, NoMachine, X11, or a local desktop; the helper does not bypass or automate login, CAPTCHA, payment, permission, or account prompts.
 - Do not use the same persistent profile concurrently in simultaneous relay processes.
@@ -48,7 +48,7 @@ By default this keeps the user's current visible ChatGPT Intelligence selection.
 - Clipboard paste remains only as a fallback for small images when upload is unavailable.
 - Large images do not automatically fall back to native clipboard paste because that can destabilize the Chrome bridge; they return upload permission remediation instead.
 - The helper refuses to send the prompt if ChatGPT does not show a confirmed uploaded or pasted attachment before send.
-- Chrome-extension mode defaults to `~/.codex/gpt-relay/sessions.json`; Playwright headless mode defaults to `~/.cache/gpt-relay/sessions.json`.
+- Chrome-extension mode defaults to `~/.codex/gpt-relay/sessions.json`; CloakBrowser headless mode defaults to `~/.cache/gpt-relay/sessions.json`.
 - Set `statePath` or `GPT_RELAY_STATE` to share one explicit session store across runtimes.
 - If the Chrome-extension runtime cannot write its default store, it falls back to `nodeRepl.tmpDir`, returns `session.stateWarning`, and later session searches also check that fallback store.
 - May need selector updates if ChatGPT changes its UI.
@@ -171,11 +171,10 @@ When `imageMarkdown` is present, paste those Markdown lines into the Codex reply
 
 ## HPC / Headless Chromium CLI
 
-Install package dependencies from the repository root, then install the Chromium browser and Linux system dependencies Playwright needs:
+Install package dependencies from the repository root. CloakBrowser downloads its Chromium binary on first launch:
 
 ```bash
 npm install
-npx playwright install --with-deps chromium
 ```
 
 Run the server doctor without launching Chromium:
@@ -190,11 +189,11 @@ The direct CLI is:
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs
 ```
 
-Doctor JSON is intended for server setup checks and automation logs. It reports configuration readiness such as runtime, persistent profile path, profile readability/writability, session state path, Playwright importability, optional browser-launch status, warnings, and remediation. `--doctor --json --no-launch` does not send a prompt or open ChatGPT.
+Doctor JSON is intended for server setup checks and automation logs. It reports configuration readiness such as runtime, persistent profile path, profile readability/writability, session state path, browser runtime importability, optional browser-launch status, warnings, and remediation. `--doctor --json --no-launch` does not send a prompt or open ChatGPT.
 
 Defaults:
 
-- Persistent profile: `~/.cache/gpt-relay/chromium-profile`
+- Persistent profile: `~/.cache/gpt-relay/cloak-profile`
 - Session state: `~/.cache/gpt-relay/sessions.json`
 
 Prepare a persistent ChatGPT profile once in a GUI session:
@@ -202,7 +201,7 @@ Prepare a persistent ChatGPT profile once in a GUI session:
 ```bash
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
   --login \
-  --profile ~/.cache/gpt-relay/chromium-profile
+  --profile ~/.cache/gpt-relay/cloak-profile
 ```
 
 First-time ChatGPT login, CAPTCHA, account, and permission prompts are not bypassed or automated. Complete them in a GUI-capable session such as VNC, NoMachine, X11, or a local desktop.
@@ -211,7 +210,7 @@ Run later from SSH or a batch job with the same persistent profile. Do not use t
 
 ```bash
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
-  --profile ~/.cache/gpt-relay/chromium-profile \
+  --profile ~/.cache/gpt-relay/cloak-profile \
   --model 5.5 \
   --mode pro \
   --prompt "너 무슨 모델이냐?"
@@ -219,12 +218,14 @@ node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
 
 Runtime/config environment variables:
 
-- `GPT_RELAY_RUNTIME=chrome|playwright`
+- `GPT_RELAY_RUNTIME=chrome|cloak`
 - `GPT_RELAY_PROFILE`
 - `GPT_RELAY_STATE`
-- `GPT_RELAY_CHROMIUM_CHANNEL`
+- `GPT_RELAY_CLOAK_LICENSE_KEY`
+- `GPT_RELAY_CLOAK_BROWSER_VERSION`
+- `GPT_RELAY_CLOAK_HUMANIZE`
 - `GPT_RELAY_CHROMIUM_EXECUTABLE`
 - `GPT_RELAY_HEADLESS`
 - `GPT_RELAY_CHROMIUM_ARGS`
 
-CLI options include `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, and `--login`. The relay does not recommend `--no-sandbox` by default; risky explicit browser arguments are operator-owned, and doctor mode warns about them.
+CLI options include `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, `--cloak-license-key`, `--cloak-browser-version`, `--cloak-humanize`, and `--login`. The relay does not solve or bypass CAPTCHA or human verification; those prompts still stop the relay and must be completed by the user. The relay does not recommend `--no-sandbox` by default; risky explicit browser arguments are operator-owned, and doctor mode warns about them.

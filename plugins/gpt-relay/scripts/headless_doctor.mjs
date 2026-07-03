@@ -1,6 +1,6 @@
 import { constants as fsConstants } from "node:fs";
 import { access, stat } from "node:fs/promises";
-import { PLAYWRIGHT_REMEDIATION } from "./headless_cli_config.mjs";
+import { CLOAKBROWSER_REMEDIATION } from "./headless_cli_config.mjs";
 
 export async function runDoctor(config, options) {
   const profile = await inspectProfile(config.profilePath);
@@ -9,20 +9,20 @@ export async function runDoctor(config, options) {
     warnings.push("Profile path exists but is not a directory.");
   }
 
-  const playwrightImport = await checkPlaywrightImport(options.importPlaywright);
+  const browserImport = await checkBrowserImport(config, options);
   const browserLaunch = await checkBrowserLaunch(config, {
     noLaunch: options.noLaunch,
     createBrowser: options.createBrowser,
-    playwrightImportOk: playwrightImport.ok,
+    browserImportOk: browserImport.ok,
   });
-  const remediation = doctorRemediation({ profile, playwrightImport, browserLaunch });
+  const remediation = doctorRemediation({ profile, browserImport, browserLaunch });
   const ok = Boolean(
-    config.runtime === "playwright" &&
+    config.runtime === "cloak" &&
     profile.profileExists &&
     profile.profileIsDirectory &&
     profile.profileReadable &&
     profile.profileWritable &&
-    playwrightImport.ok &&
+    browserImport.ok &&
     (browserLaunch.skipped || browserLaunch.ok)
   );
 
@@ -34,7 +34,7 @@ export async function runDoctor(config, options) {
     profileReadable: profile.profileReadable,
     profileWritable: profile.profileWritable,
     statePath: config.statePath,
-    playwrightImport,
+    browserImport,
     browserLaunch,
     warnings,
     remediation,
@@ -53,7 +53,7 @@ export function writeDoctorReport(report, { json, stdout }) {
     `profile: ${report.profilePath}`,
     `profile exists/readable/writable: ${report.profileExists}/${report.profileReadable}/${report.profileWritable}`,
     `state: ${report.statePath}`,
-    `playwright import: ${report.playwrightImport.ok}`,
+    `browser import: ${report.browserImport.name} ${report.browserImport.ok}`,
     `browser launch: ${report.browserLaunch.skipped ? "skipped" : report.browserLaunch.ok}`,
     ...report.warnings.map((warning) => `warning: ${warning}`),
     ...report.remediation.map((entry) => `remediation: ${entry}`),
@@ -61,8 +61,8 @@ export function writeDoctorReport(report, { json, stdout }) {
   ].join("\n"));
 }
 
-export async function defaultImportPlaywright() {
-  return import("playwright");
+export async function defaultImportCloakBrowser() {
+  return import("cloakbrowser");
 }
 
 async function inspectProfile(profilePath) {
@@ -101,12 +101,15 @@ async function inspectProfile(profilePath) {
   return profile;
 }
 
-async function checkPlaywrightImport(importPlaywright) {
+async function checkBrowserImport(config, options) {
+  const name = "cloakbrowser";
+  const importBrowser = options.importCloakBrowser;
   try {
-    await importPlaywright();
-    return { ok: true };
+    await importBrowser();
+    return { name, ok: true };
   } catch (error) {
     return compactObject({
+      name,
       ok: false,
       code: error?.code,
       error: error?.message ?? String(error),
@@ -118,21 +121,25 @@ async function checkBrowserLaunch(config, options) {
   if (options.noLaunch) {
     return { ok: null, skipped: true };
   }
-  if (!options.playwrightImportOk) {
-    return { ok: false, skipped: true, error: "Skipped because Playwright could not be imported." };
+  if (!options.browserImportOk) {
+    return { ok: false, skipped: true, error: `Skipped because ${config.runtime} browser runtime could not be imported.` };
   }
-  if (config.runtime !== "playwright") {
-    return { ok: false, skipped: true, error: "Skipped because this CLI only launches the Playwright runtime." };
+  if (config.runtime !== "cloak") {
+    return { ok: false, skipped: true, error: "Skipped because this CLI only launches the CloakBrowser persistent Chromium runtime." };
   }
 
   let browser;
   try {
     browser = await options.createBrowser({
       userDataDir: config.profilePath,
+      runtime: config.runtime,
       headless: config.headless,
       channel: config.channel,
       executablePath: config.executablePath,
       args: config.browserArgs,
+      cloakLicenseKey: config.cloakLicenseKey,
+      cloakBrowserVersion: config.cloakBrowserVersion,
+      cloakHumanize: config.cloakHumanize,
       closeOnFinalize: true,
     });
     return { ok: true, skipped: false };
@@ -148,7 +155,7 @@ async function checkBrowserLaunch(config, options) {
   }
 }
 
-function doctorRemediation({ profile, playwrightImport, browserLaunch }) {
+function doctorRemediation({ profile, browserImport, browserLaunch }) {
   const remediation = [];
   if (!profile.profileExists) {
     remediation.push("Create the persistent Chromium profile directory, then run --login from a GUI-capable session.");
@@ -162,8 +169,8 @@ function doctorRemediation({ profile, playwrightImport, browserLaunch }) {
       remediation.push("Grant write permission on the persistent Chromium profile directory.");
     }
   }
-  if (!playwrightImport.ok || browserLaunch.ok === false) {
-    remediation.push(PLAYWRIGHT_REMEDIATION);
+  if (!browserImport.ok || browserLaunch.ok === false) {
+    remediation.push(CLOAKBROWSER_REMEDIATION);
   }
   remediation.push("Do not use the same persistent profile from simultaneous relay processes.");
   return [...new Set(remediation)];

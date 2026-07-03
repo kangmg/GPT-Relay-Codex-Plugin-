@@ -4,10 +4,10 @@ import { execFile } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import {
+  cloakBrowserMissingError,
   createPlaywrightChromiumBrowser,
-  defaultUserDataDir,
+  defaultCloakUserDataDir,
   expandPath,
-  playwrightMissingError,
 } from "./playwright_chromium_adapter.mjs";
 
 const CHATGPT_URL = "https://chatgpt.com/";
@@ -501,12 +501,12 @@ function resolveRelayRuntimeConfig(options = {}, env = process.env) {
     options.profile,
     options.userDataDir,
     env.GPT_RELAY_PROFILE,
-    runtime === "playwright" ? defaultUserDataDir() : undefined
+    defaultPersistentUserDataDir(runtime)
   );
   const statePathValue = firstConfiguredValue(
     options.statePath,
     env.GPT_RELAY_STATE,
-    runtime === "playwright" ? defaultPlaywrightStatePath() : undefined
+    isPersistentBrowserRuntime(runtime) ? defaultPersistentStatePath() : undefined
   );
 
   const profile = expandConfiguredPath(profileValue);
@@ -534,6 +534,21 @@ function resolveRelayRuntimeConfig(options = {}, env = process.env) {
       options.browserArgs,
       env.GPT_RELAY_CHROMIUM_ARGS
     )),
+    cloakLicenseKey: optionalString(firstConfiguredValue(
+      options.cloakLicenseKey,
+      env.GPT_RELAY_CLOAK_LICENSE_KEY,
+      env.CLOAKBROWSER_LICENSE_KEY
+    )),
+    cloakBrowserVersion: optionalString(firstConfiguredValue(
+      options.cloakBrowserVersion,
+      env.GPT_RELAY_CLOAK_BROWSER_VERSION,
+      env.CLOAKBROWSER_VERSION
+    )),
+    cloakHumanize: normalizeHeadless(firstConfiguredValue(
+      options.cloakHumanize,
+      env.GPT_RELAY_CLOAK_HUMANIZE,
+      false
+    )),
   };
 }
 
@@ -551,11 +566,11 @@ async function resolveBrowserLease(
     };
   }
 
-  if (runtimeConfig.runtime === "playwright") {
+  if (isPersistentBrowserRuntime(runtimeConfig.runtime)) {
     return {
-      browser: await createPlaywrightBrowser(runtimeConfig, options),
+      browser: await createPersistentBrowser(runtimeConfig, options),
       helperOwned: true,
-      runtime: "playwright",
+      runtime: runtimeConfig.runtime,
       statePath: runtimeConfig.statePath,
     };
   }
@@ -568,9 +583,10 @@ async function resolveBrowserLease(
   };
 }
 
-async function createPlaywrightBrowser(runtimeConfig, options = {}) {
-  const factory = options.playwrightFactory ?? createPlaywrightChromiumBrowser;
+async function createPersistentBrowser(runtimeConfig, options = {}) {
+  const factory = options.browserFactory ?? createPlaywrightChromiumBrowser;
   const browserOptions = {
+    runtime: runtimeConfig.runtime,
     userDataDir: runtimeConfig.profile,
     headless: runtimeConfig.headless,
     args: runtimeConfig.browserArgs,
@@ -583,27 +599,38 @@ async function createPlaywrightBrowser(runtimeConfig, options = {}) {
   if (runtimeConfig.executablePath) {
     browserOptions.executablePath = runtimeConfig.executablePath;
   }
-  if (options.playwright) {
-    browserOptions.playwright = options.playwright;
+  if (runtimeConfig.runtime === "cloak") {
+    if (runtimeConfig.cloakLicenseKey) {
+      browserOptions.cloakLicenseKey = runtimeConfig.cloakLicenseKey;
+    }
+    if (runtimeConfig.cloakBrowserVersion) {
+      browserOptions.cloakBrowserVersion = runtimeConfig.cloakBrowserVersion;
+    }
+    if (runtimeConfig.cloakHumanize) {
+      browserOptions.cloakHumanize = true;
+    }
+    if (options.cloakbrowser) {
+      browserOptions.cloakbrowser = options.cloakbrowser;
+    }
   }
 
   try {
     return await factory(browserOptions);
   } catch (error) {
-    throw normalizePlaywrightCreationError(error);
+    throw normalizePersistentBrowserCreationError(error);
   }
 }
 
-function normalizePlaywrightCreationError(error) {
-  if (error?.code === "PLAYWRIGHT_MISSING") {
+function normalizePersistentBrowserCreationError(error) {
+  if (error?.code === "CLOAKBROWSER_MISSING") {
     return error;
   }
   if (
     error?.code === "ERR_MODULE_NOT_FOUND" ||
     error?.code === "MODULE_NOT_FOUND" ||
-    /Cannot find package ['"]playwright['"]/.test(String(error?.message ?? ""))
+    /Cannot find package ['"]cloakbrowser['"]/.test(String(error?.message ?? ""))
   ) {
-    return playwrightMissingError(error);
+    return cloakBrowserMissingError(error);
   }
   return error;
 }
@@ -659,13 +686,33 @@ async function finalizeBrowserLease(browserLease, tab, keepTab) {
 
 function normalizeRelayRuntime(value) {
   const runtime = String(value ?? "").trim().toLowerCase() || DEFAULT_RELAY_RUNTIME;
-  if (runtime === "chrome" || runtime === "playwright") {
+  if (runtime === "chrome" || runtime === "cloak") {
     return runtime;
+  }
+  if (
+    runtime === "cloakbrowser" ||
+    runtime === "cloak-browser" ||
+    runtime === "stealth" ||
+    runtime === "chromium" ||
+    runtime === "headless"
+  ) {
+    return "cloak";
   }
   throw codedError(
     "RELAY_RUNTIME_INVALID",
-    "GPT Relay runtime must be either \"chrome\" or \"playwright\"."
+    "GPT Relay runtime must be \"chrome\" or \"cloak\"."
   );
+}
+
+function isPersistentBrowserRuntime(runtime) {
+  return runtime === "cloak";
+}
+
+function defaultPersistentUserDataDir(runtime) {
+  if (runtime === "cloak") {
+    return defaultCloakUserDataDir();
+  }
+  return undefined;
 }
 
 function normalizeHeadless(value) {
@@ -715,8 +762,8 @@ function expandConfiguredPath(value) {
   return text ? expandPath(text) : undefined;
 }
 
-function defaultPlaywrightStatePath() {
-  return path.join(path.dirname(defaultUserDataDir()), "sessions.json");
+function defaultPersistentStatePath() {
+  return path.join(path.dirname(defaultCloakUserDataDir()), "sessions.json");
 }
 
 async function findBrowserClientModule() {

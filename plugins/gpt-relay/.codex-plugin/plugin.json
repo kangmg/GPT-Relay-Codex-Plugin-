@@ -1,7 +1,7 @@
 {
   "name": "gpt-relay",
   "version": "0.1.0+codex.20260609094842",
-  "description": "Relay Codex prompts to ChatGPT through Chrome or Playwright headless and return the response.",
+  "description": "Relay Codex prompts to ChatGPT through Chrome or CloakBrowser headless and return the response.",
   "author": {
     "name": "Prompt Case"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "GPT Relay",
     "shortDescription": "Relay, resume, and poll ChatGPT from Codex or a headless server profile.",
-    "longDescription": "GPT Relay uses the existing Chrome plugin session by default to open ChatGPT, select requested visible ChatGPT Intelligence options, send prompts, attach supported files through ChatGPT upload controls, keep the ChatGPT tab open, wait for the assistant to finish in persisted chunks, store session metadata, continue prior conversations, poll backgrounded answers, save generated image artifacts locally, export completed Deep Research reports to Markdown artifacts, and return assistant responses, reports, or generated images to Codex. For server, SSH, or batch use, the same relay can run through Playwright Chromium with a prepared persistent ChatGPT profile and doctor checks; first-time login, CAPTCHA, account, and permission prompts still require a GUI-capable session and are not bypassed or automated.",
+    "longDescription": "GPT Relay uses the existing Chrome plugin session by default to open ChatGPT, select requested visible ChatGPT Intelligence options, send prompts, attach supported files through ChatGPT upload controls, keep the ChatGPT tab open, wait for the assistant to finish in persisted chunks, store session metadata, continue prior conversations, poll backgrounded answers, save generated image artifacts locally, export completed Deep Research reports to Markdown artifacts, and return assistant responses, reports, or generated images to Codex. For server, SSH, or batch use, the same relay can run through CloakBrowser Chromium with a prepared persistent ChatGPT profile and doctor checks; first-time login, CAPTCHA, account, and permission prompts still require a GUI-capable session and are not bypassed or automated.",
     "developerName": "Prompt Case",
     "category": "Productivity",
     "capabilities": [

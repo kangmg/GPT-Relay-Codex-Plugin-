@@ -5,7 +5,7 @@
 **Branch:** main
 
 ## OVERVIEW
-Community Codex plugin that relays prompts to ChatGPT through either the Codex Chrome extension runtime or the Playwright Chromium headless CLI. The core is a single ESM plugin package under `plugins/gpt-relay`.
+Community Codex plugin that relays prompts to ChatGPT through either the Codex Chrome extension runtime or the CloakBrowser Chromium headless CLI. The core is a single ESM plugin package under `plugins/gpt-relay`.
 
 ## STRUCTURE
 ```text
@@ -18,7 +18,7 @@ Community Codex plugin that relays prompts to ChatGPT through either the Codex C
     ├── README.md                            # plugin-local docs
     ├── skills/gpt-relay/SKILL.md            # Codex operational contract
     ├── scripts/chatgpt_relay.mjs            # main relay implementation
-    ├── scripts/headless_chromium_relay.mjs  # Playwright Chromium CLI
+    ├── scripts/headless_chromium_relay.mjs  # CloakBrowser Chromium CLI
     ├── scripts/playwright_chromium_adapter.mjs
     ├── scripts/chatgpt_relay.test.mjs       # node:test suite
     ├── native/macos-copy-image-to-clipboard.m
@@ -29,7 +29,7 @@ Community Codex plugin that relays prompts to ChatGPT through either the Codex C
 | Task | Location | Notes |
 | --- | --- | --- |
 | Relay behavior/API | `plugins/gpt-relay/scripts/chatgpt_relay.mjs` | Exports `runExtendedProRelay`, `startExtendedProRelay`, `continueExtendedProRelay`, `pollRelaySession`, `listRelaySessions`, `getRelaySession`. Large hotspot; keep edits narrow. |
-| Headless server CLI | `plugins/gpt-relay/scripts/headless_chromium_relay.mjs` | CLI wrapper around Playwright Chromium and `runExtendedProRelay`. |
+| Headless server CLI | `plugins/gpt-relay/scripts/headless_chromium_relay.mjs` | CLI wrapper around CloakBrowser Chromium and `runExtendedProRelay`. |
 | Browser facade | `plugins/gpt-relay/scripts/playwright_chromium_adapter.mjs` | Implements the browser/tab shape consumed by `chatgpt_relay.mjs`. |
 | Codex skill behavior | `plugins/gpt-relay/skills/gpt-relay/SKILL.md` | Runtime expectations and final-output contract that Codex follows. |
 | Plugin metadata | `plugins/gpt-relay/.codex-plugin/plugin.json` | Marketplace-facing description, capabilities, prompts, logo paths. |
@@ -44,7 +44,7 @@ Community Codex plugin that relays prompts to ChatGPT through either the Codex C
 | `startExtendedProRelay` | export function | `plugins/gpt-relay/scripts/chatgpt_relay.mjs` | Starts a resumable pending relay. |
 | `continueExtendedProRelay` | export function | `plugins/gpt-relay/scripts/chatgpt_relay.mjs` | Continues a stored session. |
 | `pollRelaySession` | export function | `plugins/gpt-relay/scripts/chatgpt_relay.mjs` | Polls stored pending/long-running sessions. |
-| `createPlaywrightChromiumBrowser` | export function | `plugins/gpt-relay/scripts/playwright_chromium_adapter.mjs` | Creates the Playwright browser facade. |
+| `createPlaywrightChromiumBrowser` | export function | `plugins/gpt-relay/scripts/playwright_chromium_adapter.mjs` | Creates the CloakBrowser-backed browser facade. |
 | `main` | CLI boundary | `plugins/gpt-relay/scripts/headless_chromium_relay.mjs` | Parses CLI args, creates browser, runs relay. |
 
 ## CONVENTIONS
@@ -79,5 +79,5 @@ node plugins/gpt-relay/scripts/headless_chromium_relay.mjs --help
 ## NOTES
 - TypeScript LSP is not installed in this environment; use source reads, `rg`, and Node checks unless the user explicitly authorizes LSP installation.
 - `chatgpt_relay.mjs` is over 4,900 lines. Prefer extracting small helpers only when it reduces real complexity; avoid unrelated cleanup.
-- Headless server work should use Playwright Chromium with a separate persistent automation profile. Do not point automation at the user's normal Chrome profile.
+- Headless server work should use CloakBrowser Chromium with a separate persistent automation profile. Do not point automation at the user's normal Chrome profile.
 - First-time ChatGPT login still needs a GUI-capable session such as VNC, NoMachine, or X11; headless mode reuses the prepared profile.

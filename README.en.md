@@ -25,13 +25,12 @@ Existing threads may keep using the previously cached plugin, so start a new thr
 
 ## HPC / Headless Chromium
 
-For HPC or SSH-only use, run the relay from the cloned checkout with Playwright Chromium. This mode does not use the Codex Chrome extension, but it still needs a persistent ChatGPT browser profile.
+For HPC or SSH-only use, run the relay from the cloned checkout with CloakBrowser Chromium by default. This mode does not use the Codex Chrome extension, but it still needs a persistent ChatGPT browser profile.
 
-Install package dependencies from the repository root, then install the Chromium browser and Linux system dependencies Playwright needs:
+Install package dependencies from the repository root. CloakBrowser downloads its Chromium binary on first launch:
 
 ```bash
 npm install
-npx playwright install --with-deps chromium
 ```
 
 Check the server configuration without opening ChatGPT:
@@ -51,24 +50,24 @@ Prepare the ChatGPT profile once in a GUI session such as VNC, NoMachine, or X11
 ```bash
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
   --login \
-  --profile ~/.cache/gpt-relay/chromium-profile
+  --profile ~/.cache/gpt-relay/cloak-profile
 ```
 
-First-time ChatGPT login, CAPTCHA, account, and permission prompts are not bypassed or automated. Complete them in a GUI-capable session such as VNC, NoMachine, X11, or a local desktop. The default persistent profile is `~/.cache/gpt-relay/chromium-profile`, and the default session state file is `~/.cache/gpt-relay/sessions.json`.
+First-time ChatGPT login, CAPTCHA, account, and permission prompts are not bypassed or automated. Complete them in a GUI-capable session such as VNC, NoMachine, X11, or a local desktop. The default persistent profile is `~/.cache/gpt-relay/cloak-profile`, and the default session state file is `~/.cache/gpt-relay/sessions.json`.
 
 After login succeeds, reuse the same persistent profile from SSH, CLI, or a batch job. Do not use the same profile concurrently in simultaneous relay processes.
 
 ```bash
 node plugins/gpt-relay/scripts/headless_chromium_relay.mjs \
-  --profile ~/.cache/gpt-relay/chromium-profile \
+  --profile ~/.cache/gpt-relay/cloak-profile \
   --model 5.5 \
   --mode pro \
   --prompt "너 무슨 모델이냐?"
 ```
 
-Runtime selection and paths can be configured with `GPT_RELAY_RUNTIME=chrome|playwright`, `GPT_RELAY_PROFILE`, `GPT_RELAY_STATE`, `GPT_RELAY_CHROMIUM_CHANNEL`, `GPT_RELAY_CHROMIUM_EXECUTABLE`, `GPT_RELAY_HEADLESS`, and `GPT_RELAY_CHROMIUM_ARGS`. Chrome-extension mode remains the default for plugin and skill use; Playwright headless is available for server/CLI use and explicit helper runtime selection.
+Runtime selection and paths can be configured with `GPT_RELAY_RUNTIME=chrome|cloak`, `GPT_RELAY_PROFILE`, `GPT_RELAY_STATE`, `GPT_RELAY_CLOAK_LICENSE_KEY`, `GPT_RELAY_CLOAK_BROWSER_VERSION`, `GPT_RELAY_CLOAK_HUMANIZE`, `GPT_RELAY_CHROMIUM_EXECUTABLE`, `GPT_RELAY_HEADLESS`, and `GPT_RELAY_CHROMIUM_ARGS`. Chrome-extension mode remains the default for plugin and skill use; CloakBrowser Chromium is the only headless server/CLI runtime.
 
-CLI options include `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, and `--login`. The relay does not recommend `--no-sandbox` by default; risky explicit browser arguments are operator-owned, and doctor mode warns about them.
+CLI options include `--doctor`, `--json`, `--no-launch`, `--profile`, `--state-path`, `--channel`, `--executable-path`, repeated `--browser-arg`, `--cloak-license-key`, `--cloak-browser-version`, `--cloak-humanize`, and `--login`. The relay does not solve or bypass CAPTCHA or human verification; those prompts still stop the relay and must be completed by the user. The relay does not recommend `--no-sandbox` by default; risky explicit browser arguments are operator-owned, and doctor mode warns about them.
 
 ## Requirements
 

@@ -62,9 +62,9 @@ test("--doctor --json --no-launch prints contract JSON", async () => {
   const report = parseJsonOutput(result);
 
   assert.deepEqual(Object.keys(report).sort(), [
+    "browserImport",
     "browserLaunch",
     "ok",
-    "playwrightImport",
     "profileExists",
     "profilePath",
     "profileReadable",
@@ -74,13 +74,14 @@ test("--doctor --json --no-launch prints contract JSON", async () => {
     "statePath",
     "warnings",
   ]);
-  assert.equal(report.runtime, "playwright");
+  assert.equal(report.runtime, "cloak");
   assert.equal(report.profilePath, profile);
   assert.equal(report.profileExists, true);
   assert.equal(report.profileReadable, true);
   assert.equal(report.profileWritable, true);
   assert.equal(report.statePath, statePath);
   assert.equal(report.browserLaunch.skipped, true);
+  assert.equal(report.browserImport.name, "cloakbrowser");
   assert.equal(Array.isArray(report.warnings), true);
   assert.equal(Array.isArray(report.remediation), true);
 });
@@ -100,6 +101,13 @@ test("repeated --browser-arg values preserve ordering", () => {
   assert.deepEqual(JSON.parse(result.stdout), ["--one", "--two", "--three"]);
 });
 
+test("--runtime is no longer a CLI option", () => {
+  const result = runNode([scriptPath, "--runtime", "playwright", "--help"]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unknown option --runtime/);
+});
+
 test("CLI args override environment config", () => {
   const result = runNode([
     "--input-type=module",
@@ -107,19 +115,41 @@ test("CLI args override environment config", () => {
     [
       `const { parseArgs, resolveHeadlessConfig } = await import(${JSON.stringify(scriptUrl)});`,
       "const args = parseArgs(['--profile', '~/cli-profile', '--state-path', '~/cli-state.json', '--channel', 'chrome', '--executable-path', '/tmp/cli-chromium', '--headless=false', '--browser-arg', '--cli-arg']);",
-      "const config = resolveHeadlessConfig(args, { GPT_RELAY_PROFILE: '~/env-profile', GPT_RELAY_STATE: '~/env-state.json', GPT_RELAY_CHROMIUM_CHANNEL: 'msedge', GPT_RELAY_CHROMIUM_EXECUTABLE: '/tmp/env-chromium', GPT_RELAY_HEADLESS: 'true', GPT_RELAY_CHROMIUM_ARGS: '--env-arg' });",
+      "const config = resolveHeadlessConfig(args, { GPT_RELAY_RUNTIME: 'cloak', GPT_RELAY_PROFILE: '~/env-profile', GPT_RELAY_STATE: '~/env-state.json', GPT_RELAY_CHROMIUM_CHANNEL: 'msedge', GPT_RELAY_CHROMIUM_EXECUTABLE: '/tmp/env-chromium', GPT_RELAY_HEADLESS: 'true', GPT_RELAY_CHROMIUM_ARGS: '--env-arg' });",
       "console.log(JSON.stringify(config));",
     ].join(" "),
   ]);
 
   assert.equal(result.status, 0, result.stderr);
   const config = JSON.parse(result.stdout);
+  assert.equal(config.runtime, "cloak");
   assert.equal(config.profilePath, path.join(os.homedir(), "cli-profile"));
   assert.equal(config.statePath, path.join(os.homedir(), "cli-state.json"));
   assert.equal(config.channel, "chrome");
   assert.equal(config.executablePath, "/tmp/cli-chromium");
   assert.equal(config.headless, false);
   assert.deepEqual(config.browserArgs, ["--cli-arg"]);
+});
+
+test("CloakBrowser CLI options are surfaced in config", () => {
+  const result = runNode([
+    "--input-type=module",
+    "-e",
+    [
+      `const { parseArgs, resolveHeadlessConfig } = await import(${JSON.stringify(scriptUrl)});`,
+      "const args = parseArgs(['--cloak-license-key', 'cb_cli', '--cloak-browser-version', '148.0.7778.215.3', '--cloak-humanize']);",
+      "const config = resolveHeadlessConfig(args, { GPT_RELAY_CLOAK_LICENSE_KEY: 'cb_env', GPT_RELAY_CLOAK_BROWSER_VERSION: '146.0.0.0', GPT_RELAY_CLOAK_HUMANIZE: 'false' });",
+      "console.log(JSON.stringify({ runtime: config.runtime, key: config.cloakLicenseKey, version: config.cloakBrowserVersion, humanize: config.cloakHumanize }));",
+    ].join(" "),
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    runtime: "cloak",
+    key: "cb_cli",
+    version: "148.0.7778.215.3",
+    humanize: true,
+  });
 });
 
 test("--login implies headed mode", () => {
@@ -137,7 +167,7 @@ test("--login implies headed mode", () => {
   assert.deepEqual(JSON.parse(result.stdout), { login: true, headless: false });
 });
 
-test("login flow passes custom timeout to Playwright waitFor", async () => {
+test("login flow passes custom timeout to browser facade waitFor", async () => {
   const { __testing } = await import(scriptUrl);
   let receivedWaitForOptions;
   const browser = {
@@ -234,7 +264,7 @@ test("doctor redacts sensitive launch error details", async () => {
       `  argv: ['--profile', ${JSON.stringify(profile)}, '--doctor', '--json', '--browser-arg=--proxy-server=http://user:DUMMY_SECRET_TOKEN@example.invalid', '--browser-arg=--api-key=LEAKME_REVIEW_API_KEY'],`,
       "  stdout: { write: (text) => { stdout += text; } },",
       "  stderr: { write: () => undefined },",
-      "  importPlaywright: async () => ({}),",
+      "  importCloakBrowser: async () => ({}),",
       "  createBrowser: async () => { throw new Error('Launch failed for --proxy-server=http://user:DUMMY_SECRET_TOKEN@example.invalid --api-key=LEAKME_REVIEW_API_KEY'); },",
       "});",
       "console.log(JSON.stringify({ exitCode, report: JSON.parse(stdout) }));",

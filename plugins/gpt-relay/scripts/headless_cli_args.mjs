@@ -5,6 +5,8 @@ const VALUE_OPTIONS = new Set([
   "attachment",
   "browserArg",
   "channel",
+  "cloakBrowserVersion",
+  "cloakLicenseKey",
   "effort",
   "executablePath",
   "feature",
@@ -16,7 +18,6 @@ const VALUE_OPTIONS = new Set([
   "project",
   "prompt",
   "promptFile",
-  "runtime",
   "statePath",
   "timeoutMs",
   "uploadTimeoutMs",
@@ -28,6 +29,7 @@ const BOOLEAN_OPTIONS = new Set([
   "headed",
   "help",
   "json",
+  "cloakHumanize",
   "login",
   "noLaunch",
   "returnPending",
@@ -74,6 +76,7 @@ export function parseArgs(argv) {
       case "help":
       case "doctor":
       case "json":
+      case "cloakHumanize":
       case "noLaunch":
       case "returnPending":
         rejectInlineValue(rawKey, inlineValue);

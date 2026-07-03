@@ -7,35 +7,38 @@ const CHATGPT_ORIGIN = "https://chatgpt.com";
 
 export async function createPlaywrightChromiumBrowser(options = {}) {
   const {
-    userDataDir = defaultUserDataDir(),
+    userDataDir = defaultCloakUserDataDir(),
     headless = true,
-    channel,
     executablePath,
     viewport = DEFAULT_VIEWPORT,
     acceptDownloads = true,
     args = [],
     closeOnFinalize = true,
-    playwright: providedPlaywright,
+    cloakbrowser: providedCloakBrowser,
+    cloakLicenseKey,
+    cloakBrowserVersion,
+    cloakHumanize = false,
   } = options;
 
-  const playwright = providedPlaywright ?? await importPlaywright();
-  const context = await playwright.chromium.launchPersistentContext(
-    expandPath(userDataDir),
-    {
-      headless,
-      channel,
-      executablePath,
-      viewport,
-      acceptDownloads,
-      chromiumSandbox: true,
-      args: [
-        "--disable-dev-shm-usage",
-        "--no-first-run",
-        "--no-default-browser-check",
-        ...args,
-      ],
-    }
-  );
+  const expandedUserDataDir = expandPath(userDataDir);
+  const launchArgs = [
+    "--disable-dev-shm-usage",
+    "--no-first-run",
+    "--no-default-browser-check",
+    ...args,
+  ];
+  const context = await createCloakBrowserPersistentContext({
+    userDataDir: expandedUserDataDir,
+    headless,
+    viewport,
+    acceptDownloads,
+    executablePath,
+    args: launchArgs,
+    cloakbrowser: providedCloakBrowser,
+    cloakLicenseKey,
+    cloakBrowserVersion,
+    cloakHumanize,
+  });
 
   await context.grantPermissions(
     ["clipboard-read", "clipboard-write"],
@@ -46,7 +49,7 @@ export async function createPlaywrightChromiumBrowser(options = {}) {
   let nextTabId = 1;
 
   const browser = {
-    runtime: "playwright-chromium",
+    runtime: "cloakbrowser",
     context,
     async close() {
       await context.close().catch(() => undefined);
@@ -55,7 +58,7 @@ export async function createPlaywrightChromiumBrowser(options = {}) {
       async new() {
         const page = await context.newPage();
         const tab = createPlaywrightTab(page, {
-          id: `playwright-${nextTabId++}`,
+          id: `cloak-${nextTabId++}`,
           context,
         });
         tabs.set(tab.id, tab);
@@ -97,7 +100,7 @@ export async function createPlaywrightChromiumBrowser(options = {}) {
         const id = typeof openTab === "string" ? openTab : openTab?.id;
         const tab = tabs.get(id);
         if (!tab) {
-          throw new Error(`No Playwright tab is registered for id '${id}'.`);
+          throw new Error(`No CloakBrowser tab is registered for id '${id}'.`);
         }
         return tab;
       },
@@ -107,8 +110,8 @@ export async function createPlaywrightChromiumBrowser(options = {}) {
   return browser;
 }
 
-export function defaultUserDataDir() {
-  return path.join(os.homedir(), ".cache", "gpt-relay", "chromium-profile");
+export function defaultCloakUserDataDir() {
+  return path.join(os.homedir(), ".cache", "gpt-relay", "cloak-profile");
 }
 
 export function expandPath(value) {
@@ -122,20 +125,51 @@ export function expandPath(value) {
   return path.resolve(input);
 }
 
-export function playwrightMissingError(cause) {
+export function cloakBrowserMissingError(cause) {
   const wrapped = new Error(
-    "Playwright is not installed. Run `npm install` and `npx playwright install --with-deps chromium` in the checkout before using the headless Chromium relay."
+    "CloakBrowser is not installed. Run `npm install` in the checkout before using the CloakBrowser relay runtime."
   );
-  wrapped.code = "PLAYWRIGHT_MISSING";
+  wrapped.code = "CLOAKBROWSER_MISSING";
   wrapped.cause = cause;
   return wrapped;
 }
 
-async function importPlaywright() {
+async function createCloakBrowserPersistentContext({
+  userDataDir,
+  headless,
+  viewport,
+  acceptDownloads,
+  executablePath,
+  args,
+  cloakbrowser: providedCloakBrowser,
+  cloakLicenseKey,
+  cloakBrowserVersion,
+  cloakHumanize,
+}) {
+  const cloakbrowser = providedCloakBrowser ?? await importCloakBrowser();
+  return cloakbrowser.launchPersistentContext({
+    userDataDir,
+    headless,
+    args,
+    viewport,
+    humanize: Boolean(cloakHumanize),
+    ...(cloakLicenseKey ? { licenseKey: cloakLicenseKey } : {}),
+    ...(cloakBrowserVersion ? { browserVersion: cloakBrowserVersion } : {}),
+    contextOptions: {
+      acceptDownloads,
+    },
+    launchOptions: {
+      chromiumSandbox: true,
+      ...(executablePath ? { executablePath } : {}),
+    },
+  });
+}
+
+async function importCloakBrowser() {
   try {
-    return await import("playwright");
+    return await import("cloakbrowser");
   } catch (error) {
-    throw playwrightMissingError(error);
+    throw cloakBrowserMissingError(error);
   }
 }
 

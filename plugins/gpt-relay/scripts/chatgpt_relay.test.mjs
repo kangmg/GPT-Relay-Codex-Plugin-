@@ -10,9 +10,9 @@ import {
 } from "./chatgpt_relay.mjs";
 import { createPlaywrightChromiumBrowser } from "./playwright_chromium_adapter.mjs";
 
-test("runtime selection defaults to Chrome without creating Playwright", async () => {
+test("runtime selection defaults to Chrome without creating persistent browser", async () => {
   let chromeFactoryCalled = 0;
-  let playwrightFactoryCalled = 0;
+  let browserFactoryCalled = 0;
   const chromeBrowser = { runtime: "chrome-extension" };
 
   const lease = await __testing.resolveBrowserLease(
@@ -21,9 +21,9 @@ test("runtime selection defaults to Chrome without creating Playwright", async (
         chromeFactoryCalled += 1;
         return chromeBrowser;
       },
-      playwrightFactory: async () => {
-        playwrightFactoryCalled += 1;
-        throw new Error("Playwright should not be created for the default runtime.");
+      browserFactory: async () => {
+        browserFactoryCalled += 1;
+        throw new Error("Persistent browser should not be created for the default runtime.");
       },
     },
     {}
@@ -33,7 +33,7 @@ test("runtime selection defaults to Chrome without creating Playwright", async (
   assert.equal(lease.browser, chromeBrowser);
   assert.equal(lease.helperOwned, false);
   assert.equal(chromeFactoryCalled, 1);
-  assert.equal(playwrightFactoryCalled, 0);
+  assert.equal(browserFactoryCalled, 0);
 });
 
 test("runtime selection resolves options before environment defaults", () => {
@@ -46,7 +46,7 @@ test("runtime selection resolves options before environment defaults", () => {
       browserArgs: ["--option-arg"],
     },
     {
-      GPT_RELAY_RUNTIME: "playwright",
+      GPT_RELAY_RUNTIME: "cloak",
       GPT_RELAY_PROFILE: "~/env-profile",
       GPT_RELAY_STATE: "~/env-state.json",
       GPT_RELAY_HEADLESS: "false",
@@ -63,7 +63,7 @@ test("runtime selection resolves options before environment defaults", () => {
   const envConfig = __testing.resolveRelayRuntimeConfig(
     {},
     {
-      GPT_RELAY_RUNTIME: "playwright",
+      GPT_RELAY_RUNTIME: "cloak",
       GPT_RELAY_PROFILE: "~/env-profile",
       GPT_RELAY_STATE: "~/env-state.json",
       GPT_RELAY_CHROMIUM_CHANNEL: "chrome",
@@ -73,7 +73,7 @@ test("runtime selection resolves options before environment defaults", () => {
     }
   );
 
-  assert.equal(envConfig.runtime, "playwright");
+  assert.equal(envConfig.runtime, "cloak");
   assert.equal(envConfig.profile, path.join(os.homedir(), "env-profile"));
   assert.equal(envConfig.statePath, path.join(os.homedir(), "env-state.json"));
   assert.equal(envConfig.channel, "chrome");
@@ -82,7 +82,7 @@ test("runtime selection resolves options before environment defaults", () => {
   assert.deepEqual(envConfig.browserArgs, ["--disable-gpu", "--window-size=1280,900"]);
 });
 
-test("session lookup uses the Playwright default state path for headless runtime", async (t) => {
+test("session lookup uses the CloakBrowser default state path for headless runtime", async (t) => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "gpt55-relay-home-"));
   const statePath = path.join(homeDir, ".cache", "gpt-relay", "sessions.json");
   await mkdir(path.dirname(statePath), { recursive: true });
@@ -107,7 +107,7 @@ test("session lookup uses the Playwright default state path for headless runtime
   const previousNodeRepl = globalThis.nodeRepl;
   const previousRelayStatePath = globalThis.__gpt55RelayStatePath;
   t.mock.method(os, "homedir", () => homeDir);
-  process.env.GPT_RELAY_RUNTIME = "playwright";
+  process.env.GPT_RELAY_RUNTIME = "cloak";
   delete process.env.GPT_RELAY_STATE;
   globalThis.nodeRepl = {
     ...(previousNodeRepl ?? {}),
@@ -147,54 +147,56 @@ test("session lookup uses the Playwright default state path for headless runtime
   }
 });
 
-test("runtime selection creates Playwright with injected factory profile and state", async () => {
-  const playwrightBrowser = { runtime: "playwright-chromium" };
+test("runtime selection creates CloakBrowser with explicit stealth options", async () => {
+  const cloakBrowser = { runtime: "cloakbrowser" };
   let capturedOptions;
 
   const lease = await __testing.resolveBrowserLease(
     {
-      runtime: "playwright",
-      profile: "~/relay-profile",
-      statePath: "~/relay-state.json",
-      channel: "chrome",
-      executablePath: "/Applications/Chromium.app/Contents/MacOS/Chromium",
-      headless: false,
-      browserArgs: ["--disable-gpu"],
-      playwrightFactory: async (factoryOptions) => {
+      runtime: "cloak",
+      profile: "~/cloak-profile",
+      statePath: "~/cloak-state.json",
+      cloakLicenseKey: "cb_test",
+      cloakBrowserVersion: "148.0.7778.215.3",
+      cloakHumanize: true,
+      browserArgs: ["--fingerprint=relay-test"],
+      browserFactory: async (factoryOptions) => {
         capturedOptions = factoryOptions;
-        return playwrightBrowser;
+        return cloakBrowser;
       },
     },
     {}
   );
 
-  assert.equal(lease.runtime, "playwright");
-  assert.equal(lease.browser, playwrightBrowser);
+  assert.equal(lease.runtime, "cloak");
+  assert.equal(lease.browser, cloakBrowser);
   assert.equal(lease.helperOwned, true);
-  assert.equal(lease.statePath, path.join(os.homedir(), "relay-state.json"));
+  assert.equal(lease.statePath, path.join(os.homedir(), "cloak-state.json"));
   assert.deepEqual(capturedOptions, {
-    userDataDir: path.join(os.homedir(), "relay-profile"),
-    headless: false,
-    channel: "chrome",
-    executablePath: "/Applications/Chromium.app/Contents/MacOS/Chromium",
-    args: ["--disable-gpu"],
+    runtime: "cloak",
+    userDataDir: path.join(os.homedir(), "cloak-profile"),
+    headless: true,
+    args: ["--fingerprint=relay-test"],
     closeOnFinalize: true,
+    cloakLicenseKey: "cb_test",
+    cloakBrowserVersion: "148.0.7778.215.3",
+    cloakHumanize: true,
   });
 });
 
-test("missing Playwright runtime reports server install remediation", async () => {
+test("missing CloakBrowser runtime reports server install remediation", async () => {
   let chromeFactoryCalled = 0;
 
   await assert.rejects(
     () => __testing.resolveBrowserLease(
       {
-        runtime: "playwright",
+        runtime: "cloak",
         chromeBrowserFactory: async () => {
           chromeFactoryCalled += 1;
           return { runtime: "chrome-extension" };
         },
-        playwrightFactory: async () => {
-          const error = new Error("Cannot find package 'playwright'");
+        browserFactory: async () => {
+          const error = new Error("Cannot find package 'cloakbrowser'");
           error.code = "ERR_MODULE_NOT_FOUND";
           throw error;
         },
@@ -202,9 +204,8 @@ test("missing Playwright runtime reports server install remediation", async () =
       {}
     ),
     (error) => {
-      assert.equal(error.code, "PLAYWRIGHT_MISSING");
+      assert.equal(error.code, "CLOAKBROWSER_MISSING");
       assert.match(error.message, /npm install/);
-      assert.match(error.message, /npx playwright install --with-deps chromium/);
       return true;
     }
   );
@@ -212,7 +213,7 @@ test("missing Playwright runtime reports server install remediation", async () =
   assert.equal(chromeFactoryCalled, 0);
 });
 
-test("Playwright Chromium adapter enables Chromium sandbox by default", async () => {
+test("CloakBrowser adapter launches a persistent context with sandbox and profile", async () => {
   let launchOptions;
   const context = {
     async grantPermissions() {},
@@ -222,19 +223,33 @@ test("Playwright Chromium adapter enables Chromium sandbox by default", async ()
     },
   };
   await createPlaywrightChromiumBrowser({
-    userDataDir: "~/sandbox-profile",
-    playwright: {
-      chromium: {
-        async launchPersistentContext(_userDataDir, options) {
-          launchOptions = options;
-          return context;
-        },
+    runtime: "cloak",
+    userDataDir: "~/cloak-sandbox-profile",
+    headless: false,
+    args: ["--fingerprint=relay-test"],
+    cloakLicenseKey: "cb_test",
+    cloakBrowserVersion: "148.0.7778.215.3",
+    cloakHumanize: true,
+    cloakbrowser: {
+      async launchPersistentContext(options) {
+        launchOptions = options;
+        return context;
       },
     },
   });
 
-  assert.equal(launchOptions.chromiumSandbox, true);
-  assert.equal(launchOptions.args.includes("--no-sandbox"), false);
+  assert.equal(launchOptions.userDataDir, path.join(os.homedir(), "cloak-sandbox-profile"));
+  assert.equal(launchOptions.headless, false);
+  assert.deepEqual(launchOptions.args, [
+    "--disable-dev-shm-usage",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--fingerprint=relay-test",
+  ]);
+  assert.equal(launchOptions.licenseKey, "cb_test");
+  assert.equal(launchOptions.browserVersion, "148.0.7778.215.3");
+  assert.equal(launchOptions.humanize, true);
+  assert.equal(launchOptions.launchOptions.chromiumSandbox, true);
 });
 
 test("runtime selection finalizer closes helper-owned browsers but not caller-owned browsers", async () => {

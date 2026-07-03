@@ -7,7 +7,7 @@ import { runExtendedProRelay } from "./chatgpt_relay.mjs";
 import { CliError, parseArgs } from "./headless_cli_args.mjs";
 import { helpText, resolveHeadlessConfig } from "./headless_cli_config.mjs";
 import {
-  defaultImportPlaywright,
+  defaultImportCloakBrowser,
   redactSensitiveError,
   runDoctor,
   writeDoctorReport,
@@ -28,7 +28,7 @@ export async function main(options = {}) {
     stderr = process.stderr,
     createBrowser = createPlaywrightChromiumBrowser,
     relay = runExtendedProRelay,
-    importPlaywright = defaultImportPlaywright,
+    importCloakBrowser = defaultImportCloakBrowser,
   } = options;
 
   const args = parseArgs(argv);
@@ -44,15 +44,15 @@ export async function main(options = {}) {
     const report = await runDoctor(config, {
       noLaunch: args.noLaunch,
       createBrowser,
-      importPlaywright,
+      importCloakBrowser,
     });
     writeDoctorReport(report, { json: args.json, stdout });
     return 0;
   }
 
-  if (config.runtime !== "playwright") {
+  if (config.runtime !== "cloak") {
     throw new CliError(
-      `headless_chromium_relay.mjs requires runtime 'playwright', received '${config.runtime}'.`,
+      `headless_chromium_relay.mjs requires runtime 'cloak', received '${config.runtime}'.`,
       "INVALID_RUNTIME"
     );
   }
@@ -66,11 +66,15 @@ export async function main(options = {}) {
   }
 
   const browser = await createBrowser({
+    runtime: config.runtime,
     userDataDir: config.profilePath,
     headless: config.headless,
     channel: config.channel,
     executablePath: config.executablePath,
     args: config.browserArgs,
+    cloakLicenseKey: config.cloakLicenseKey,
+    cloakBrowserVersion: config.cloakBrowserVersion,
+    cloakHumanize: config.cloakHumanize,
     closeOnFinalize: true,
   });
 
